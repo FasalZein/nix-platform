@@ -12,6 +12,8 @@ in
   nixpkgs.hostPlatform = "aarch64-darwin";
   system.stateVersion = 6;
   system.primaryUser = "tothemoon";
+  # home-manager reads the home directory from here.
+  users.users.tothemoon.home = "/Users/tothemoon";
 
   # Lix, installed by the Lix installer and managed here (nix.enable = true is
   # required by nix.linux-builder).
