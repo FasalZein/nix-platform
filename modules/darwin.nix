@@ -6,7 +6,7 @@ let
   # Stage 1: false. The first switch must use the default linux-builder,
   # because a changed builder config has to be built by a Linux builder
   # (nix-darwin modules/nix/linux-builder.nix). Set true after stage 1 works.
-  builderTuned = false;
+  builderTuned = true;
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
