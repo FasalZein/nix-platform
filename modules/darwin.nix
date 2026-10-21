@@ -59,5 +59,12 @@ in
     eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
   '';
 
+  # Default caps for every shell, including agent shells. `heavy` lowers them
+  # further per slot. Without a cap each vitest run starts cores-1 workers.
+  environment.variables = {
+    VITEST_MAX_WORKERS = "4";
+    CARGO_BUILD_JOBS = "4";
+  };
+
   # Homebrew stays unmanaged for now; move casks into homebrew.casks later.
 }
