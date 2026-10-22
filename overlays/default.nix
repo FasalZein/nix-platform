@@ -7,6 +7,8 @@ final: prev: {
   # nixpkgs ships a newer bun; repos pin bun@1.4.0. Same derivation, older release zips.
   bun = prev.bun.overrideAttrs (old: {
     version = "1.4.0";
+    # src follows passthru.sources below, so the version and src do change together.
+    __intentionallyOverridingVersion = true;
     passthru = old.passthru // {
       sources = {
         aarch64-darwin = final.fetchurl {
