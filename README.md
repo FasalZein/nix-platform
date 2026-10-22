@@ -1,6 +1,6 @@
 # nix-platform
 
-Machine config for MacBook-Pro-2 (nix-darwin + home-manager, Lix). Later: shared overlays and devenv modules for every repository.
+Machine config for MacBook-Pro-2 (nix-darwin + home-manager, Lix), plus a shared overlay and devenv module for every repository.
 
 Plan and decisions: `~/.pi/artifacts/nix-plan/nix-migration-plan-20261021.md`.
 
@@ -26,6 +26,28 @@ Plan and decisions: `~/.pi/artifacts/nix-plan/nix-migration-plan-20261021.md`.
 4. Check the Linux builder: `nix build --system aarch64-linux nixpkgs#hello --print-out-paths`.
 5. Stage 2: set `builderTuned = true` in `modules/darwin.nix` (6 cores, 12 GiB RAM, 80 GiB disk), then
    `sudo darwin-rebuild switch --flake .#MacBook-Pro-2`.
+
+## Shared overlay and devenv module
+
+- `overlays.default` (overlays/default.nix) pins bun, node, uv, and postgres. Rust stays per repo in `rust-toolchain.toml`; pnpm stays in `package.json` `packageManager`.
+- `devenvModules.default` (devenv/devenv.nix) holds settings every repo shares. Repos enable their own languages.
+- `nix flake check` runs `checks.aarch64-darwin.pin-drift`. It fails when a pinned tool reports a version other than `expected-versions.nix`.
+
+Repo template (`devenv.yaml`). `git+https` uses the git credential helper; a `github:` URL needs a Nix access token for this private repo.
+
+```yaml
+inputs:
+  nix-platform:
+    url: git+https://github.com/FasalZein/nix-platform
+    overlays:
+      - default
+  nixpkgs:
+    follows: nix-platform/nixpkgs
+imports:
+  - nix-platform/devenv
+```
+
+Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv allow`. After a push here, run `devenv update` in each repo to pick up the change.
 
 ## Daily use
 
