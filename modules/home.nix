@@ -7,6 +7,15 @@
     devenv
     nix-fast-build
     nixfmt
+    # Fast search and inspection tools named in ~/.pi/agent/AGENTS.md (Tooling).
+    ripgrep
+    fd
+    ast-grep
+    jq
+    bat
+    eza
+    hyperfine
+    dust
   ];
 
   # Writes ~/.config/direnv/direnvrc with nix-direnv (cached, GC-rooted envs).
