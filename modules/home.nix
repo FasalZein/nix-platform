@@ -16,6 +16,13 @@
     eza
     hyperfine
     dust
+    # Pinned by overlays/default.nix (versions in expected-versions.nix).
+    # Ahead of Homebrew, ~/.bun/bin and ~/.local/bin via /etc/zlogin (modules/darwin.nix).
+    bun
+    uv
+    nodejs
+    git
+    gh
   ];
 
   # Writes ~/.config/direnv/direnvrc with nix-direnv (cached, GC-rooted envs).

@@ -39,7 +39,11 @@
     darwinConfigurations."MacBook-Pro-2" = nix-darwin.lib.darwinSystem {
       modules = [
         ./modules/darwin.nix
-        { system.configurationRevision = self.rev or self.dirtyRev or null; }
+        {
+          system.configurationRevision = self.rev or self.dirtyRev or null;
+          # System and home-manager packages (useGlobalPkgs) get the pinned bun, node and uv.
+          nixpkgs.overlays = [ self.overlays.default ];
+        }
         home-manager.darwinModules.home-manager
         {
           home-manager.useGlobalPkgs = true;
