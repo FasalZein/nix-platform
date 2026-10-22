@@ -68,5 +68,10 @@ in
     CARGO_BUILD_JOBS = "4";
   };
 
+  # GNU coreutils after /usr/bin and /bin (mkAfter = order 1500; the system
+  # dirs use 1200). Missing commands (timeout, nproc) resolve to GNU; stat,
+  # date and mktemp keep their BSD flags. Not in a profile, so it stays last.
+  environment.systemPath = lib.mkAfter [ "${pkgs.coreutils}/bin" ];
+
   # Homebrew stays unmanaged for now; move casks into homebrew.casks later.
 }
