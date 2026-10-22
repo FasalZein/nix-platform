@@ -1,5 +1,5 @@
 {
-  description = "nix-platform: nix-darwin + home-manager for MacBook-Pro-2, shared overlays later";
+  description = "nix-platform: nix-darwin + home-manager for MacBook-Pro-2, shared overlay and devenv module";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -9,7 +9,33 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nix-darwin, home-manager, ... }: {
+  outputs = { self, nixpkgs, nix-darwin, home-manager, ... }:
+  let
+    # Checks and packages run on this Mac only; the overlay itself works on every system.
+    system = "aarch64-darwin";
+    pkgs = import nixpkgs { inherit system; overlays = [ self.overlays.default ]; };
+    expected = import ./expected-versions.nix;
+  in {
+    overlays.default = import ./overlays/default.nix;
+
+    devenvModules.default = ./devenv/devenv.nix;
+
+    packages.${system} = { inherit (pkgs) bun nodejs uv postgresql; };
+
+    # Fails when a pinned tool reports a version other than expected-versions.nix.
+    checks.${system}.pin-drift = pkgs.runCommand "pin-drift" { } ''
+      fail=0
+      check() {
+        if [ "$2" = "$3" ]; then echo "ok   $1 $2"
+        else echo "DRIFT $1: got '$2', expected '$3' (expected-versions.nix)"; fail=1; fi
+      }
+      check bun "$(${pkgs.bun}/bin/bun --version)" "${expected.bun}"
+      check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs}"
+      check uv "$(${pkgs.uv}/bin/uv --version | cut -d' ' -f2)" "${expected.uv}"
+      check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
+      [ "$fail" = 0 ] && touch $out
+    '';
+
     darwinConfigurations."MacBook-Pro-2" = nix-darwin.lib.darwinSystem {
       modules = [
         ./modules/darwin.nix
