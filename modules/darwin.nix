@@ -83,12 +83,19 @@ in
   environment.variables = {
     VITEST_MAX_WORKERS = "4";
     CARGO_BUILD_JOBS = "4";
+    # The Nix npm's default global prefix is inside the read-only store, so
+    # `npm i -g` needs a user prefix. Homebrew globals stay where they are.
+    NPM_CONFIG_PREFIX = "${config.users.users.tothemoon.home}/.npm-global";
   };
 
   # GNU coreutils after /usr/bin and /bin (mkAfter = order 1500; the system
   # dirs use 1200). Missing commands (timeout, nproc) resolve to GNU; stat,
   # date and mktemp keep their BSD flags. Not in a profile, so it stays last.
-  environment.systemPath = lib.mkAfter [ "${pkgs.coreutils}/bin" ];
+  # Globals from `npm i -g` (NPM_CONFIG_PREFIX above) come just before it.
+  environment.systemPath = lib.mkAfter [
+    "${config.users.users.tothemoon.home}/.npm-global/bin"
+    "${pkgs.coreutils}/bin"
+  ];
 
   # Homebrew stays unmanaged for now; move casks into homebrew.casks later.
 }
