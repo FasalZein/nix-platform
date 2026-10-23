@@ -1,0 +1,4 @@
+# Pi runtime state created by the integration probes.
+/auth.json
+/models-store.json
+/sessions/
