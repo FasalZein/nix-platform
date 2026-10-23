@@ -1,8 +1,0 @@
-{
-  "name": "request-telemetry",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "description": "Per-request payload composition, prefix-divergence, and usage telemetry for pi.",
-  "pi": { "extensions": ["./index.ts"] }
-}
