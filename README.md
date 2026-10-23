@@ -27,6 +27,8 @@ Plan and decisions: `~/.pi/artifacts/nix-plan/nix-migration-plan-20261021.md`.
 5. Stage 2: set `builderTuned = true` in `modules/darwin.nix` (6 cores, 12 GiB RAM, 80 GiB disk), then
    `sudo darwin-rebuild switch --flake .#MacBook-Pro-2`.
 
+The Linux builder VM runs on demand. The first Linux build starts it and waits for its boot. A timer stops it after 30 idle minutes and logs to `/var/log/linux-builder-idle-stop.log`. To start it by hand: `sudo launchctl kickstart system/org.nixos.linux-builder`.
+
 ## Shared overlay and devenv module
 
 - `overlays.default` (overlays/default.nix) pins bun, node, uv, and postgres. Rust stays per repo in `rust-toolchain.toml`; pnpm stays in `package.json` `packageManager`.

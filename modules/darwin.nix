@@ -7,6 +7,7 @@ let
   # because a changed builder config has to be built by a Linux builder
   # (nix-darwin modules/nix/linux-builder.nix). Set true after stage 1 works.
   builderTuned = true;
+  linuxBuilderOnDemand = pkgs.callPackage ../packages/linux-builder-on-demand.nix { };
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -112,6 +113,29 @@ in
       virtualisation.darwin-builder.memorySize = 12 * 1024;  # MiB
       virtualisation.darwin-builder.diskSize = 80 * 1024;    # MiB
     };
+  };
+
+  # On-demand builder (owner decision 2026-10-24): the VM no longer runs while
+  # idle. The first ssh to linux-builder (nix-daemon dispatching an
+  # aarch64-linux build) starts it through the ProxyCommand below and waits
+  # for the guest sshd; a timer stops it after 30 idle minutes. Only host-side
+  # launchd and ssh settings change, so the VM package needs no rebuild.
+  launchd.daemons.linux-builder.serviceConfig = {
+    KeepAlive = lib.mkForce false;
+    RunAtLoad = lib.mkForce false;
+  };
+  # ssh takes the first value per option and reads ssh_config.d in lexical
+  # order, so this file adds ProxyCommand ahead of nix-darwin's 100-linux-builder.conf.
+  environment.etc."ssh/ssh_config.d/099-linux-builder-on-demand.conf".text = ''
+    Host linux-builder
+      ProxyCommand ${lib.getExe linuxBuilderOnDemand} wake 127.0.0.1 %p
+  '';
+  launchd.daemons.linux-builder-idle-stop.serviceConfig = {
+    ProgramArguments = [ (lib.getExe linuxBuilderOnDemand) "reap" ];
+    StartInterval = 300;
+    ProcessType = "Background";
+    StandardOutPath = "/var/log/linux-builder-idle-stop.log";
+    StandardErrorPath = "/var/log/linux-builder-idle-stop.log";
   };
 
   # direnv hook in /etc/zshrc, so ~/.zshrc stays untouched.
