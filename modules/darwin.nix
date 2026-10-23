@@ -42,6 +42,31 @@ in
     automatic = true;
     interval = [{ Weekday = 0; Hour = 4; Minute = 0; }];
   };
+  # Store maintenance yields to interactive work: efficiency cores, low I/O priority.
+  launchd.daemons.nix-gc.serviceConfig = { ProcessType = "Background"; LowPriorityIO = true; };
+  launchd.daemons.nix-optimise.serviceConfig = { ProcessType = "Background"; LowPriorityIO = true; };
+
+  # Hourly (owner decision 2026-10-23): stop per-worktree devenv services, such as a
+  # worktree's test Postgres, that no process uses. They start again with the next
+  # `devenv up`. Add a repo here when its devenv.nix declares services.
+  launchd.user.agents.worktree-idle-sweep.serviceConfig =
+    let
+      home = config.users.users.tothemoon.home;
+      repos = [ "${home}/Dev/Bayland/bayland-portfolio-v1" ];
+    in {
+      ProgramArguments = [ "/bin/bash" "-c"
+        ''for r in ${lib.escapeShellArgs repos}; do ${home}/.pi/agent/bin/worktrees-idle "$r" --stop; done'' ];
+      StartInterval = 3600;
+      ProcessType = "Background";
+      LowPriorityIO = true;
+      # devenv from the user profile; lsof from /usr/sbin.
+      EnvironmentVariables = {
+        HOME = home;
+        PATH = "/etc/profiles/per-user/tothemoon/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin";
+      };
+      StandardOutPath = "${home}/Library/Logs/worktree-idle-sweep.log";
+      StandardErrorPath = "${home}/Library/Logs/worktree-idle-sweep.log";
+    };
 
   # aarch64-linux builds for local CI and NixOS VM tests.
   nix.linux-builder = {
