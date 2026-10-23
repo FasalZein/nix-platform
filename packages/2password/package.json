@@ -1,0 +1,13 @@
+{
+  "name": "2password",
+  "version": "0.2.0",
+  "type": "module",
+  "bin": {
+    "2password": "bin/2password"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.1",
+    "@effect/platform-node-shared": "4.0.1",
+    "effect": "4.0.1"
+  }
+}

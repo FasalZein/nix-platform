@@ -26,6 +26,10 @@
       "9router" = pkgs.callPackage ./packages/9router.nix { };
       # Run by the linux-builder ProxyCommand and idle timer in modules/darwin.nix.
       linux-builder-on-demand = pkgs.callPackage ./packages/linux-builder-on-demand.nix { };
+      # Run by the secrets-render login agent in modules/darwin.nix.
+      "2password" = pkgs.callPackage ./packages/2password { };
+      secrets-render = pkgs.callPackage ./packages/secrets-render.nix { };
+      secrets-refresh = pkgs.callPackage ./packages/secrets-refresh.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -46,6 +50,36 @@
       "9router" = self.packages.${system}."9router";
       # writeShellApplication runs shellcheck on the script.
       linux-builder-on-demand = self.packages.${system}.linux-builder-on-demand;
+      # The npm tarball hash and package-lock.json pin 2password and its dependencies.
+      "2password" = self.packages.${system}."2password";
+      secrets-render = self.packages.${system}.secrets-render;
+      secrets-refresh = self.packages.${system}.secrets-refresh;
+      # Values rendered by 2password's own env renderer survive the zsh loader
+      # byte for byte ($, backticks, quotes, backslashes, newlines, key pools).
+      shell-secrets-loader = pkgs.runCommand "shell-secrets-loader" {
+        nativeBuildInputs = [ pkgs.bun pkgs.zsh ];
+        loader = builtins.replaceStrings [ "@shellEnvFile@" ] [ "$RENDERED" ]
+          (builtins.readFile ./secrets/load-shell-secrets.zsh);
+      } ''
+        export HOME=$TMPDIR
+        cp -R ${self.packages.${system}."2password"}/lib/node_modules/2password $TMPDIR/tp
+        chmod -R u+w $TMPDIR/tp
+        cp ${./secrets/loader-test.ts} $TMPDIR/tp/loader-test.ts
+        export RENDERED=$TMPDIR/shell.env
+        bun $TMPDIR/tp/loader-test.ts $RENDERED $TMPDIR/expected
+        printf '%s\n' "$loader" > $TMPDIR/loader.zsh
+        zsh -f -c '
+          source $TMPDIR/loader.zsh
+          while read -r name hex; do
+            got=$(printf "%s" "''${(P)name}" | od -An -tx1 | tr -d " \n")
+            if [[ $got == $hex ]]; then echo "ok   $name"; else echo "FAIL $name"; fail=1; fi
+          done < $TMPDIR/expected
+          exit ''${fail:-0}
+        '
+        # Without a rendered file the loader exports nothing and succeeds.
+        RENDERED=$TMPDIR/missing zsh -f -c 'source $TMPDIR/loader.zsh && [[ -z ''${PLAIN-} ]]'
+        touch $out
+      '';
     };
 
     darwinConfigurations."MacBook-Pro-2" = nix-darwin.lib.darwinSystem {
