@@ -24,6 +24,8 @@
       inherit (pkgs) bun nodejs uv postgresql;
       # Run by the launchd agent in modules/darwin.nix.
       "9router" = pkgs.callPackage ./packages/9router.nix { };
+      # Run by the linux-builder ProxyCommand and idle timer in modules/darwin.nix.
+      linux-builder-on-demand = pkgs.callPackage ./packages/linux-builder-on-demand.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -42,6 +44,8 @@
       '';
       # Builds the package; the tarball hash pins the app version.
       "9router" = self.packages.${system}."9router";
+      # writeShellApplication runs shellcheck on the script.
+      linux-builder-on-demand = self.packages.${system}.linux-builder-on-demand;
     };
 
     darwinConfigurations."MacBook-Pro-2" = nix-darwin.lib.darwinSystem {
