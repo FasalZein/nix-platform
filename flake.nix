@@ -20,21 +20,29 @@
 
     devenvModules.default = ./devenv/devenv.nix;
 
-    packages.${system} = { inherit (pkgs) bun nodejs uv postgresql; };
+    packages.${system} = {
+      inherit (pkgs) bun nodejs uv postgresql;
+      # Run by the launchd agent in modules/darwin.nix.
+      "9router" = pkgs.callPackage ./packages/9router.nix { };
+    };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
-    checks.${system}.pin-drift = pkgs.runCommand "pin-drift" { } ''
-      fail=0
-      check() {
-        if [ "$2" = "$3" ]; then echo "ok   $1 $2"
-        else echo "DRIFT $1: got '$2', expected '$3' (expected-versions.nix)"; fail=1; fi
-      }
-      check bun "$(${pkgs.bun}/bin/bun --version)" "${expected.bun}"
-      check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs}"
-      check uv "$(${pkgs.uv}/bin/uv --version | cut -d' ' -f2)" "${expected.uv}"
-      check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
-      [ "$fail" = 0 ] && touch $out
-    '';
+    checks.${system} = {
+      pin-drift = pkgs.runCommand "pin-drift" { } ''
+        fail=0
+        check() {
+          if [ "$2" = "$3" ]; then echo "ok   $1 $2"
+          else echo "DRIFT $1: got '$2', expected '$3' (expected-versions.nix)"; fail=1; fi
+        }
+        check bun "$(${pkgs.bun}/bin/bun --version)" "${expected.bun}"
+        check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs}"
+        check uv "$(${pkgs.uv}/bin/uv --version | cut -d' ' -f2)" "${expected.uv}"
+        check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
+        [ "$fail" = 0 ] && touch $out
+      '';
+      # Builds the package; the tarball hash pins the app version.
+      "9router" = self.packages.${system}."9router";
+    };
 
     darwinConfigurations."MacBook-Pro-2" = nix-darwin.lib.darwinSystem {
       modules = [

@@ -68,6 +68,39 @@ in
       StandardErrorPath = "${home}/Library/Logs/worktree-idle-sweep.log";
     };
 
+  # 9router AI gateway on 127.0.0.1:20128, native instead of Docker (owner
+  # decision 2026-10-23). Label org.nixos.9router. Secrets stay out of the
+  # store: the script exports the KEY=VALUE lines of ~/Dev/9router/.env at
+  # start, literally, as Docker's env_file did. Data stays in ~/.9router.
+  launchd.user.agents."9router".serviceConfig =
+    let
+      home = config.users.users.tothemoon.home;
+      ninerouter = pkgs.callPackage ../packages/9router.nix { };
+      baseUrl = "http://localhost:20128";
+    in {
+      ProgramArguments = [ "/bin/bash" "-c" ''
+        while IFS= read -r line || [ -n "$line" ]; do
+          case "$line" in ""|"#"*) continue ;; esac
+          export "$line"
+        done < ${home}/Dev/9router/.env
+        exec ${lib.getExe ninerouter}
+      '' ];
+      RunAtLoad = true;
+      KeepAlive = true;
+      EnvironmentVariables = {
+        HOME = home;
+        DATA_DIR = "${home}/.9router";
+        PORT = "20128";
+        HOSTNAME = "127.0.0.1";
+        NODE_ENV = "production";
+        BASE_URL = baseUrl;
+        NEXT_PUBLIC_BASE_URL = baseUrl;
+        PATH = "/usr/bin:/bin:/usr/sbin";
+      };
+      StandardOutPath = "${home}/Library/Logs/9router.log";
+      StandardErrorPath = "${home}/Library/Logs/9router.log";
+    };
+
   # aarch64-linux builds for local CI and NixOS VM tests.
   nix.linux-builder = {
     enable = true;
