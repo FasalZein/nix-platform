@@ -4,24 +4,24 @@
 # Worker caps (VITEST_MAX_WORKERS, CARGO_BUILD_JOBS) are not here: heavy owns them.
 # Expected versions: ../expected-versions.nix (checked by `nix flake check`).
 final: prev: {
-  # nixpkgs ships a newer bun; repos pin bun@1.4.0. Same derivation, older release zips.
+  # Repos pin bun@1.4.4 (security fix over 1.4.0); the locked nixpkgs ships 1.4.2. Same derivation, other release zips.
   bun = prev.bun.overrideAttrs (old: {
-    version = "1.4.0";
+    version = "1.4.4";
     # src follows passthru.sources below, so the version and src do change together.
     __intentionallyOverridingVersion = true;
     passthru = old.passthru // {
       sources = {
         aarch64-darwin = final.fetchurl {
-          url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-aarch64.zip";
-          hash = "sha256-xmnpf2Fk4cluBwF0jbmN+ndJKQjL2DlMdVcTSnNd44E=";
+          url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-darwin-aarch64.zip";
+          hash = "sha256-wkDX8My5DCY6hJ/NsJt+5iYw2SE0jtaq/ahrnVd7xRA=";
         };
         aarch64-linux = final.fetchurl {
-          url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-aarch64.zip";
-          hash = "sha256-SxozLuhhmD65O8/m93D/+U4+MbLDiL2uo8jtNeWO7Q4=";
+          url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-aarch64.zip";
+          hash = "sha256-uqa7NvUdblhWHgK76oJQOKnfRU9nPW13bou/hvjHhQ4=";
         };
         x86_64-linux = final.fetchurl {
-          url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64-baseline.zip";
-          hash = "sha256-GE+0WV8NQBohfPfHjBvEMLqDMU2reouUgFurv3+nCX8=";
+          url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip";
+          hash = "sha256-4ERutVmVdy65iUvrrppr42jZhai5Jx7hJEhvmUbu3XY=";
         };
       };
     };
