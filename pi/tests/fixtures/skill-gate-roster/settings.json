@@ -1,0 +1,9 @@
+{
+  "retry": {
+    "enabled": false,
+    "provider": {
+      "timeoutMs": 1000,
+      "maxRetries": 0
+    }
+  }
+}
