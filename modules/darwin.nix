@@ -8,6 +8,9 @@ let
   # (nix-darwin modules/nix/linux-builder.nix). Set true after stage 1 works.
   builderTuned = true;
   linuxBuilderOnDemand = pkgs.callPackage ../packages/linux-builder-on-demand.nix { };
+
+  # Rendered env file of the shell secrets: outside every repo and the Nix store.
+  shellEnvFile = "${config.users.users.tothemoon.home}/.local/state/nix-platform/secrets/shell.env";
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -101,6 +104,34 @@ in
       StandardOutPath = "${home}/Library/Logs/9router.log";
       StandardErrorPath = "${home}/Library/Logs/9router.log";
     };
+
+  # Shell secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
+  # renders secrets/shell.env.tpl (1Password references only) through the saved
+  # 2password service account into shellEnvFile (mode 0400, folder 0700,
+  # excluded from Time Machine). A failed render keeps the last good file.
+  # `secrets-refresh` restarts the agent. Values never enter the store.
+  launchd.user.agents.secrets-render.serviceConfig =
+    let home = config.users.users.tothemoon.home;
+    in {
+      ProgramArguments = [ (lib.getExe (pkgs.callPackage ../packages/secrets-render.nix { })) ];
+      RunAtLoad = true;
+      EnvironmentVariables = {
+        HOME = home;
+        RENDER_TEMPLATE = "${../secrets/shell.env.tpl}";
+        RENDER_TARGET = shellEnvFile;
+        # Fresh values on every render, also from a long-running op daemon. One
+        # uncached render costs 1 service-account read request (measured 2026-10-24).
+        OP_CACHE = "false";
+        # op from the Homebrew 1password-cli cask; osascript (Keychain) and tmutil.
+        PATH = "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin";
+      };
+      StandardOutPath = "${home}/Library/Logs/secrets-render.log";
+      StandardErrorPath = "${home}/Library/Logs/secrets-render.log";
+    };
+  environment.systemPackages = [ (pkgs.callPackage ../packages/secrets-refresh.nix { }) ];
+  # /etc/zshenv runs for every zsh, interactive or not; ~/.zshenv and ~/.zshrc stay untouched.
+  programs.zsh.shellInit = builtins.replaceStrings [ "@shellEnvFile@" ] [ shellEnvFile ]
+    (builtins.readFile ../secrets/load-shell-secrets.zsh);
 
   # aarch64-linux builds for local CI and NixOS VM tests.
   nix.linux-builder = {
