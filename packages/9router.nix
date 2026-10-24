@@ -8,13 +8,13 @@
 
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "9router";
-  # Same app version as the Docker image it replaces (2026-10-23).
-  version = "0.5.75";
+  # Latest npm release on 2026-10-24 (was 0.5.75, the Docker image version).
+  version = "0.5.109";
 
   src = fetchurl {
     url = "https://registry.npmjs.org/9router/-/9router-${finalAttrs.version}.tgz";
     # npm registry "integrity" field.
-    hash = "sha512-dyFdRBvDZT48nFCr0Du48phnKMIDOuSE0Q0VSk8xTXyaSNpRUaJ0K8y2JELcRuTkY1tXwuuUqOm5i6ZNZLB48Q==";
+    hash = "sha512-MKI/tfQSpMhToVyVkXanHddxdfD1YQGYR4+jCxjGrMxz1xNrbR6WuNmY2+jpV745JOvGz9wlDel+APodwaEyfw==";
   };
 
   nativeBuildInputs = [ makeWrapper ];
