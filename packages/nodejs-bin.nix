@@ -2,7 +2,7 @@
 # pin that is newer than the Node of the locked nixpkgs. The hashes are the
 # SHASUMS256.txt values of the release, converted to SRI.
 # Includes node, npm, npx and corepack, as the release tarball does.
-{ lib, stdenv, fetchurl }:
+{ lib, stdenv, fetchurl, python3 }:
 
 let
   version = "22.23.4";
@@ -51,6 +51,13 @@ stdenv.mkDerivation {
   preFixup = ''
     export HOST_PATH=$out/bin:$HOST_PATH
   '';
+
+  # Read by nixpkgs from its nodejs: buildNpmPackage and importNpmLock use
+  # nodejs.python (node-gyp), interpreter tooling reads interpreterName.
+  passthru = {
+    python = python3;
+    interpreterName = "nodejs";
+  };
 
   meta = {
     description = "Node.js ${version} (official release binaries)";

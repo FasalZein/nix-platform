@@ -49,7 +49,7 @@ imports:
   - nix-platform/devenv
 ```
 
-The repo picks its Node major in `devenv.nix`: `pkgs.nodejs_22` (22.23.4) or `pkgs.nodejs_24` (24.21.0). Without `package`, devenv uses `pkgs.nodejs` (24). corepack runs the `packageManager` version from `package.json`.
+The repo picks its Node major in `devenv.nix`: `pkgs.nodejs_22` (22.23.4) or `pkgs.nodejs_24` (24.21.0). Always set `languages.javascript.package`: without it, devenv uses `pkgs.nodejs-slim`, which has no npm and which pin-drift does not check. corepack runs the `packageManager` version from `package.json`.
 
 ```nix
 { pkgs, ... }:
