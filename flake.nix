@@ -21,7 +21,7 @@
     devenvModules.default = ./devenv/devenv.nix;
 
     packages.${system} = {
-      inherit (pkgs) bun nodejs uv postgresql;
+      inherit (pkgs) bun nodejs nodejs_22 nodejs_24 uv postgresql;
       # Run by the launchd agent in modules/darwin.nix.
       "9router" = pkgs.callPackage ./packages/9router.nix { };
       # Run by the linux-builder ProxyCommand and idle timer in modules/darwin.nix.
@@ -43,7 +43,9 @@
           else echo "DRIFT $1: got '$2', expected '$3' (expected-versions.nix)"; fail=1; fi
         }
         check bun "$(${pkgs.bun}/bin/bun --version)" "${expected.bun}"
-        check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs}"
+        check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs_24}"
+        check nodejs_22 "$(${pkgs.nodejs_22}/bin/node --version)" "v${expected.nodejs_22}"
+        check nodejs_24 "$(${pkgs.nodejs_24}/bin/node --version)" "v${expected.nodejs_24}"
         check uv "$(${pkgs.uv}/bin/uv --version | cut -d' ' -f2)" "${expected.uv}"
         check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
         [ "$fail" = 0 ] && touch $out

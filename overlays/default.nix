@@ -27,6 +27,12 @@ final: prev: {
     };
   });
 
+  # Node majors: repos pick one with languages.javascript.package = pkgs.nodejs_22 or pkgs.nodejs_24.
+  # Security pin: repos need 22.23.4; the locked nixpkgs ships 22.23.3. Official release binaries.
+  # Remove this line when nixpkgs nodejs_22 reaches 22.23.4 (then pin-drift checks the nixpkgs build).
+  nodejs_22 = final.callPackage ../packages/nodejs-bin.nix { };
+  # nodejs_24 comes from nixpkgs (flake.lock).
+
   # Major versions are chosen here; the exact version comes from flake.lock (nixpkgs).
   nodejs = final.nodejs_24;
   postgresql = final.postgresql_17;
