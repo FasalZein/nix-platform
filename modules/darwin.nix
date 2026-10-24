@@ -13,6 +13,7 @@ let
   secretsDir = "${config.users.users.tothemoon.home}/.local/state/nix-platform/secrets";
   shellEnvFile = "${secretsDir}/shell.env";
   ninerouterEnvFile = "${secretsDir}/9router.env";
+  ymcqDevEnvFile = "${secretsDir}/ymcq-dev.env";
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -121,6 +122,7 @@ in
         (lib.getExe (pkgs.callPackage ../packages/secrets-render.nix { }))
         "${../secrets/shell.env.tpl}" shellEnvFile
         "${../secrets/9router.env.tpl}" ninerouterEnvFile
+        "${../secrets/ymcq-dev.env.tpl}" ymcqDevEnvFile
       ];
       RunAtLoad = true;
       EnvironmentVariables = {
