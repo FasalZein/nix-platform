@@ -106,6 +106,16 @@
         [ "$(tail -n 1 $TMPDIR/log | cut -d' ' -f2-)" = "secrets-render: done: 1 of 2 files rendered" ]
         if grep -q fake-value $TMPDIR/log; then echo "FAIL the log holds a value"; exit 1; fi
 
+        # A failed install (mv) is a failed render: non-zero exit, last good file kept.
+        cp $s/one.env $TMPDIR/one.good
+        printf '#!/bin/sh\nexit 1\n' > $TMPDIR/bin/mv; chmod +x $TMPDIR/bin/mv; patchShebangs $TMPDIR/bin/mv
+        if render $TMPDIR/one.tpl $s/one.env > $TMPDIR/log; then
+          echo "FAIL a failed install must give a non-zero exit"; exit 1
+        fi
+        cmp $s/one.env $TMPDIR/one.good
+        grep -q 'failed for .*/one.env: could not install the rendered file' $TMPDIR/log
+        rm $TMPDIR/bin/mv
+
         # An odd argument count is a usage error.
         if render $TMPDIR/one.tpl 2> $TMPDIR/err; then exit 1; fi
         grep -q usage $TMPDIR/err

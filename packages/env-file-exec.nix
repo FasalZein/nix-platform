@@ -7,6 +7,8 @@ writeTextFile {
   name = "env-file-exec";
   executable = true;
   destination = "/bin/env-file-exec";
+  # zsh -f matters: /etc/zshenv runs the shell-secrets loader only when rcs is
+  # set, so -f keeps the shell secrets out of the launched command's env.
   text = "#!${zsh}/bin/zsh -f\n"
     + builtins.replaceStrings [ "@loader@" ] [
         (builtins.replaceStrings [ "@shellEnvFile@" ] [ "$env_file" ]

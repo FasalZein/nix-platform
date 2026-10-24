@@ -71,8 +71,11 @@ render_one() {
     err="only $rendered of $expected variables have a value"
     return 1
   fi
-  chmod 400 "$tmp"
-  mv -f "$tmp" "$target"
+  # render_one runs inside an if, where set -e is off: check the install step.
+  if ! { chmod 400 "$tmp" && mv -f "$tmp" "$target"; }; then
+    err="could not install the rendered file"
+    return 1
+  fi
   log "rendered $rendered of $expected variables into $target (attempt $attempt)"
 }
 
