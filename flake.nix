@@ -76,6 +76,11 @@
           done < $TMPDIR/expected
           exit ''${fail:-0}
         '
+        # A name that is already set keeps its value.
+        PLAIN=preset zsh -f -c 'source $TMPDIR/loader.zsh && [[ $PLAIN == preset && -n $POOL ]]'
+        # With xtrace on, the trace holds no value, and the values still load.
+        zsh -f -c 'setopt xtrace; source $TMPDIR/loader.zsh; unsetopt xtrace; [[ $PLAIN == abc123XYZ ]]' 2> $TMPDIR/trace
+        if grep -qF abc123XYZ $TMPDIR/trace; then echo "FAIL xtrace leaks a value"; exit 1; fi
         # Without a rendered file the loader exports nothing and succeeds.
         RENDERED=$TMPDIR/missing zsh -f -c 'source $TMPDIR/loader.zsh && [[ -z ''${PLAIN-} ]]'
         touch $out

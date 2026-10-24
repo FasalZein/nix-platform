@@ -2,8 +2,11 @@
 # the secrets-render login agent writes (modules/darwin.nix). No value is in
 # this file or the Nix store. Runs from /etc/zshenv, so every zsh, interactive
 # or not, loads it. Without the file (before the first render) it does nothing.
+# A name that is already set keeps its value (per-command, direnv or inherited
+# overrides win; owner decision 2026-10-24). xtrace is off inside, so `zsh -x`
+# cannot print values.
 () {
-  emulate -L zsh -o extended_glob
+  emulate -L zsh -o extended_glob -o no_xtrace
   local file=@shellEnvFile@ line name value out
   local -i i
   local -a match mbegin mend
@@ -11,6 +14,7 @@
   while IFS= read -r line || [[ -n $line ]]; do
     [[ $line == (#b)([A-Za-z_][A-Za-z0-9_]#)=\"(*)\" ]] || continue
     name=$match[1] value=$match[2]
+    [[ -v $name ]] && continue
     if [[ $value == *\\* ]]; then
       # Undo the escapes of `2password env resolve`: \\ \" \n \r. Nothing
       # else is expanded, so values keep $, backticks and quotes literally.
