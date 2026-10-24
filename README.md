@@ -2,7 +2,7 @@
 
 Machine config for MacBook-Pro-2 (nix-darwin + home-manager, Lix), plus a shared overlay and devenv module for every repository.
 
-Plan and decisions: `~/.pi/artifacts/nix-plan/nix-migration-plan-20261021.md`.
+Plan and decisions: `docs/specs/nix-phase2.md` and `docs/adr/`; tickets are GitHub issues.
 
 ## First install (run by hand; needs sudo)
 
