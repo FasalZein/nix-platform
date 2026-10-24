@@ -1,8 +1,9 @@
 # ymcq dev app env: env template rendered by the secrets-render login agent
 # (modules/darwin.nix) into the rendered env file ymcq dev loads.
 # References only, by opaque vault, item and section IDs: vault = agent vault,
-# item = "ymcq-dev" (copy of the ymcq vault item). Variable names equal
-# ~/Dev/ymcq/.env.tpl; the plain lines are local dev settings, not secrets.
+# item = the ymcq dev app env item (a copy of the item in the project vault).
+# Variable names equal ~/Dev/ymcq/.env.tpl; the plain lines are local dev
+# settings, not secrets.
 # Keep plain values unquoted: secrets-render counts quoted lines as
 # rendered references.
 
