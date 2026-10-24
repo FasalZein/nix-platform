@@ -31,16 +31,16 @@ The Linux builder VM runs on demand. The first Linux build starts it and waits f
 
 ## Shared overlay and devenv module
 
-- `overlays.default` (overlays/default.nix) pins bun, node, uv, and postgres. Rust stays per repo in `rust-toolchain.toml`; pnpm stays in `package.json` `packageManager`.
+- `overlays.default` (overlays/default.nix) pins bun, node (majors 22 and 24; the default `nodejs` is 24), uv, and postgres. Rust stays per repo in `rust-toolchain.toml`; pnpm stays in `package.json` `packageManager`.
 - `devenvModules.default` (devenv/devenv.nix) holds settings every repo shares. Repos enable their own languages.
-- `nix flake check` runs `checks.aarch64-darwin.pin-drift`. It fails when a pinned tool reports a version other than `expected-versions.nix`.
+- `nix flake check` runs `checks.aarch64-darwin.pin-drift`. It fails when a pinned tool (each Node major too) reports a version other than `expected-versions.nix`.
 
-Repo template (`devenv.yaml`). `git+https` uses the git credential helper; a `github:` URL needs a Nix access token for this private repo.
+Repo template (`devenv.yaml`). The platform repository is public (ADR 0002), so the `github:` reference needs no token.
 
 ```yaml
 inputs:
   nix-platform:
-    url: git+https://github.com/FasalZein/nix-platform
+    url: github:FasalZein/nix-platform
     overlays:
       - default
   nixpkgs:
@@ -48,6 +48,21 @@ inputs:
 imports:
   - nix-platform/devenv
 ```
+
+The repo picks its Node major in `devenv.nix`: `pkgs.nodejs_22` (22.23.4) or `pkgs.nodejs_24` (24.21.0). Always set `languages.javascript.package`: without it, devenv uses `pkgs.nodejs-slim`, which has no npm and which pin-drift does not check. corepack runs the `packageManager` version from `package.json`.
+
+```nix
+{ pkgs, ... }:
+{
+  languages.javascript = {
+    enable = true;
+    package = pkgs.nodejs_22;
+    corepack.enable = true;
+  };
+}
+```
+
+Check: `devenv shell -- node --version` prints the version of the chosen major.
 
 Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv allow`. After a push here, run `devenv update` in each repo to pick up the change.
 

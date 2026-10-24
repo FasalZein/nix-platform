@@ -15,13 +15,15 @@
     system = "aarch64-darwin";
     pkgs = import nixpkgs { inherit system; overlays = [ self.overlays.default ]; };
     expected = import ./expected-versions.nix;
+    # nodejs_22 of the locked nixpkgs, without the overlay's security pin.
+    nixpkgsNode22 = nixpkgs.legacyPackages.${system}.nodejs_22.version;
   in {
     overlays.default = import ./overlays/default.nix;
 
     devenvModules.default = ./devenv/devenv.nix;
 
     packages.${system} = {
-      inherit (pkgs) bun nodejs uv postgresql;
+      inherit (pkgs) bun nodejs nodejs_22 nodejs_24 uv postgresql;
       # Run by the launchd agent in modules/darwin.nix.
       "9router" = pkgs.callPackage ./packages/9router.nix { };
       # Run by the linux-builder ProxyCommand and idle timer in modules/darwin.nix.
@@ -43,7 +45,15 @@
           else echo "DRIFT $1: got '$2', expected '$3' (expected-versions.nix)"; fail=1; fi
         }
         check bun "$(${pkgs.bun}/bin/bun --version)" "${expected.bun}"
-        check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs}"
+        check nodejs "$(${pkgs.nodejs}/bin/node --version)" "v${expected.nodejs_24}"
+        check nodejs_22 "$(${pkgs.nodejs_22}/bin/node --version)" "v${expected.nodejs_22}"
+        check nodejs_24 "$(${pkgs.nodejs_24}/bin/node --version)" "v${expected.nodejs_24}"
+        # The nodejs_22 override must not outlive its reason.
+        ${if pkgs.lib.versionAtLeast nixpkgsNode22 expected.nodejs_22 then ''
+          echo "STALE nodejs_22 override: nixpkgs ships ${nixpkgsNode22} >= pin ${expected.nodejs_22}; remove the nodejs_22 line in overlays/default.nix"; fail=1
+        '' else ''
+          echo "ok   nodejs_22 override still needed (nixpkgs ${nixpkgsNode22} < ${expected.nodejs_22})"
+        ''}
         check uv "$(${pkgs.uv}/bin/uv --version | cut -d' ' -f2)" "${expected.uv}"
         check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
         [ "$fail" = 0 ] && touch $out
@@ -52,6 +62,14 @@
       "9router" = self.packages.${system}."9router";
       # writeShellApplication runs shellcheck on the script.
       linux-builder-on-demand = self.packages.${system}.linux-builder-on-demand;
+      # The overlay replaces nodejs_22 for every nixpkgs package. zx is a small
+      # buildNpmPackage consumer of nodejs_22: it must build with the release-binary
+      # Node (npmConfigHook reads nodejs.python and srcOnly nodejs) and run on it.
+      nodejs_22-npm-consumer = pkgs.runCommand "nodejs_22-npm-consumer" { } ''
+        ${pkgs.lib.getExe pkgs.zx} --version
+        grep -rqF ${pkgs.nodejs_22}/bin/node ${pkgs.zx}
+        touch $out
+      '';
       # The npm tarball hash and package-lock.json pin 2password and its dependencies.
       "2password" = self.packages.${system}."2password";
       secrets-render = self.packages.${system}.secrets-render;
