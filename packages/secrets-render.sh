@@ -47,7 +47,8 @@ done
 
 describe_last_good() {
   if [ -f "$1" ]; then
-    echo "last good file kept ($(grep -cE "$names_re=" "$1" || true) variables, $(stat -f '%Sm' -t '%FT%T%z' "$1"))"
+    # Rendered references are the quoted lines; plain lines are copied as they are.
+    echo "last good file kept ($(grep -cE "$names_re=\"" "$1" || true) variables, $(stat -f '%Sm' -t '%FT%T%z' "$1"))"
   else
     echo "no rendered file yet"
   fi

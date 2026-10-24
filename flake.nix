@@ -66,12 +66,13 @@
       } ''
         mkdir -p $TMPDIR/bin
         # Fake 2password: fails for a template that holds FAIL, else writes
-        # NAME="fake-value-NAME" for each reference, and counts its calls.
+        # NAME="fake-value-NAME" for each reference, copies other lines as they
+        # are (as 2password does), and counts its calls.
         cat > $TMPDIR/bin/2password <<'EOF'
         #!/usr/bin/env bash
         echo "$3" >> "$TMPDIR/calls"
         if grep -q FAIL "$3"; then echo "fake failure" >&2; exit 1; fi
-        sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)=op:.*/\1="fake-value-\1"/p' "$3" > "$5"
+        sed -E 's/^([A-Za-z_][A-Za-z0-9_]*)=op:.*/\1="fake-value-\1"/' "$3" > "$5"
         EOF
         printf '#!/usr/bin/env bash\n[ "$1" = isexcluded ] && echo "[Excluded] $2"\nexit 0\n' > $TMPDIR/bin/tmutil
         # The script calls BSD stat (/usr/bin on the Mac) for the file time.
@@ -82,11 +83,14 @@
         render() { bash -euo pipefail $script "$@"; }
         gnustat() { ${pkgs.coreutils}/bin/stat "$@"; }
         printf 'A=op://v/i/A\nB=op://v/i/B\n' > $TMPDIR/one.tpl
-        printf '# comment\nC=op://v/j/C\n' > $TMPDIR/two.tpl
+        # A plain (non-reference) line is copied and is not counted as a variable.
+        printf '# comment\nPLAIN=dev\nC=op://v/j/C\n' > $TMPDIR/two.tpl
         s=$TMPDIR/state/secrets
 
         render $TMPDIR/one.tpl $s/one.env $TMPDIR/two.tpl $s/two.env > $TMPDIR/log
         grep -qx 'A="fake-value-A"' $s/one.env && grep -qx 'C="fake-value-C"' $s/two.env
+        grep -qx 'PLAIN=dev' $s/two.env
+        grep -q 'rendered 1 of 1 variables into .*/two.env' $TMPDIR/log
         [ "$(gnustat -c %a $s/one.env) $(gnustat -c %a $s/two.env) $(gnustat -c %a $s)" = "400 400 700" ]
         [ "$(wc -l < $TMPDIR/calls)" = 2 ]
         grep -q 'rendered 2 of 2 variables into .*/one.env' $TMPDIR/log
