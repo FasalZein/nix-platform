@@ -30,6 +30,8 @@
       "2password" = pkgs.callPackage ./packages/2password { };
       secrets-render = pkgs.callPackage ./packages/secrets-render.nix { };
       secrets-refresh = pkgs.callPackage ./packages/secrets-refresh.nix { };
+      # Run by the 9router launchd agent in modules/darwin.nix.
+      env-file-exec = pkgs.callPackage ./packages/env-file-exec.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -54,6 +56,89 @@
       "2password" = self.packages.${system}."2password";
       secrets-render = self.packages.${system}.secrets-render;
       secrets-refresh = self.packages.${system}.secrets-refresh;
+      env-file-exec = self.packages.${system}.env-file-exec;
+      # Several templates in one run, against fake 2password and tmutil: each
+      # target renders atomically with mode 0400, a failing template keeps its
+      # last good file while the others render, and the log holds no value.
+      secrets-render-multi = pkgs.runCommand "secrets-render-multi" {
+        nativeBuildInputs = [ pkgs.bash pkgs.gnugrep pkgs.gnused pkgs.coreutils ];
+        script = ./packages/secrets-render.sh;
+      } ''
+        mkdir -p $TMPDIR/bin
+        # Fake 2password: fails for a template that holds FAIL, else writes
+        # NAME="fake-value-NAME" for each reference, and counts its calls.
+        cat > $TMPDIR/bin/2password <<'EOF'
+        #!/usr/bin/env bash
+        echo "$3" >> "$TMPDIR/calls"
+        if grep -q FAIL "$3"; then echo "fake failure" >&2; exit 1; fi
+        sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)=op:.*/\1="fake-value-\1"/p' "$3" > "$5"
+        EOF
+        printf '#!/usr/bin/env bash\n[ "$1" = isexcluded ] && echo "[Excluded] $2"\nexit 0\n' > $TMPDIR/bin/tmutil
+        # The script calls BSD stat (/usr/bin on the Mac) for the file time.
+        printf '#!/usr/bin/env bash\necho 2026-10-24T00:00:00+0000\n' > $TMPDIR/bin/stat
+        chmod +x $TMPDIR/bin/*
+        patchShebangs $TMPDIR/bin
+        export PATH=$TMPDIR/bin:$PATH RENDER_RETRY_SECONDS=0 RENDER_ATTEMPTS=2
+        render() { bash -euo pipefail $script "$@"; }
+        gnustat() { ${pkgs.coreutils}/bin/stat "$@"; }
+        printf 'A=op://v/i/A\nB=op://v/i/B\n' > $TMPDIR/one.tpl
+        printf '# comment\nC=op://v/j/C\n' > $TMPDIR/two.tpl
+        s=$TMPDIR/state/secrets
+
+        render $TMPDIR/one.tpl $s/one.env $TMPDIR/two.tpl $s/two.env > $TMPDIR/log
+        grep -qx 'A="fake-value-A"' $s/one.env && grep -qx 'C="fake-value-C"' $s/two.env
+        [ "$(gnustat -c %a $s/one.env) $(gnustat -c %a $s/two.env) $(gnustat -c %a $s)" = "400 400 700" ]
+        [ "$(wc -l < $TMPDIR/calls)" = 2 ]
+        grep -q 'rendered 2 of 2 variables into .*/one.env' $TMPDIR/log
+        [ "$(tail -n 1 $TMPDIR/log | cut -d' ' -f2-)" = "secrets-render: done: 2 of 2 files rendered" ]
+        [ "$(ls -A $s)" = "$(printf 'one.env\ntwo.env')" ]  # no scratch folder left
+
+        # The second template now fails: its last good file stays, the first renders.
+        cp $s/two.env $TMPDIR/two.good
+        echo 'FAIL=op://v/j/FAIL' >> $TMPDIR/two.tpl
+        rm $TMPDIR/calls
+        if render $TMPDIR/one.tpl $s/one.env $TMPDIR/two.tpl $s/two.env > $TMPDIR/log; then
+          echo "FAIL a failed template must give a non-zero exit"; exit 1
+        fi
+        cmp $s/two.env $TMPDIR/two.good
+        [ "$(wc -l < $TMPDIR/calls)" = 3 ]  # one.tpl once, two.tpl on both attempts
+        grep -q 'render failed for .*/two.env; last good file kept (1 variables, 2026-10-24T00:00:00+0000)' $TMPDIR/log
+        [ "$(tail -n 1 $TMPDIR/log | cut -d' ' -f2-)" = "secrets-render: done: 1 of 2 files rendered" ]
+        if grep -q fake-value $TMPDIR/log; then echo "FAIL the log holds a value"; exit 1; fi
+
+        # A failed install (mv) is a failed render: non-zero exit, last good file kept.
+        cp $s/one.env $TMPDIR/one.good
+        printf '#!/bin/sh\nexit 1\n' > $TMPDIR/bin/mv; chmod +x $TMPDIR/bin/mv; patchShebangs $TMPDIR/bin/mv
+        if render $TMPDIR/one.tpl $s/one.env > $TMPDIR/log; then
+          echo "FAIL a failed install must give a non-zero exit"; exit 1
+        fi
+        cmp $s/one.env $TMPDIR/one.good
+        grep -q 'failed for .*/one.env: could not install the rendered file' $TMPDIR/log
+        rm $TMPDIR/bin/mv
+
+        # An odd argument count is a usage error.
+        if render $TMPDIR/one.tpl 2> $TMPDIR/err; then exit 1; fi
+        grep -q usage $TMPDIR/err
+        touch $out
+      '';
+      # 9router start: env-file-exec waits for a late rendered env file, loads
+      # it and runs the command; without the file it exits after the bound.
+      env-file-exec-wait = pkgs.runCommand "env-file-exec-wait" { } ''
+        run=${pkgs.lib.getExe self.packages.${system}.env-file-exec}
+        f=$TMPDIR/9router.env
+        ( sleep 2; printf 'SECRET="a$HOME\\"b"\n' > $f.tmp; mv $f.tmp $f ) &
+        $run $f 30 /bin/sh -c 'printf %s "$SECRET" > '$TMPDIR'/got' > $TMPDIR/log
+        wait
+        [ "$(cat $TMPDIR/got)" = 'a$HOME"b' ]
+        grep -q "waiting up to 30s for $f" $TMPDIR/log
+        grep -q "loading $f (waited [1-9]s)" $TMPDIR/log
+
+        # Missing file: exit 1 after the bound, with a clear log line, no start.
+        if $run $TMPDIR/missing 2 /bin/sh -c 'touch '$TMPDIR'/started' > $TMPDIR/log; then exit 1; fi
+        [ ! -e $TMPDIR/started ]
+        grep -q "error: $TMPDIR/missing missing after 2s; not starting /bin/sh" $TMPDIR/log
+        touch $out
+      '';
       # Values rendered by 2password's own env renderer survive the zsh loader
       # byte for byte ($, backticks, quotes, backslashes, newlines, key pools).
       shell-secrets-loader = pkgs.runCommand "shell-secrets-loader" {

@@ -9,8 +9,10 @@ let
   builderTuned = true;
   linuxBuilderOnDemand = pkgs.callPackage ../packages/linux-builder-on-demand.nix { };
 
-  # Rendered env file of the shell secrets: outside every repo and the Nix store.
-  shellEnvFile = "${config.users.users.tothemoon.home}/.local/state/nix-platform/secrets/shell.env";
+  # Rendered env files: outside every repo and the Nix store, in one folder.
+  secretsDir = "${config.users.users.tothemoon.home}/.local/state/nix-platform/secrets";
+  shellEnvFile = "${secretsDir}/shell.env";
+  ninerouterEnvFile = "${secretsDir}/9router.env";
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -74,21 +76,22 @@ in
 
   # 9router AI gateway on 127.0.0.1:20128, native instead of Docker (owner
   # decision 2026-10-23). Label org.nixos.9router. Secrets stay out of the
-  # store: the script exports the KEY=VALUE lines of ~/Dev/9router/.env at
-  # start, literally, as Docker's env_file did. Data stays in ~/.9router.
+  # store: env-file-exec exports the 4 secrets from ninerouterEnvFile (rendered
+  # by secrets-render below) at start. Data stays in ~/.9router.
   launchd.user.agents."9router".serviceConfig =
     let
       home = config.users.users.tothemoon.home;
       ninerouter = pkgs.callPackage ../packages/9router.nix { };
+      envFileExec = pkgs.callPackage ../packages/env-file-exec.nix { };
       baseUrl = "http://localhost:20128";
+      # Both agents start at login. The first render retries for about 2
+      # minutes when the network is down (4 attempts, 30 s apart), so 9router
+      # waits up to 300 s, as secrets-refresh does. Then it exits with a log
+      # line, and KeepAlive starts it again (and it waits again) after
+      # launchd's 10 s throttle. A file from an earlier login is used at once.
+      maxWaitSeconds = "300";
     in {
-      ProgramArguments = [ "/bin/bash" "-c" ''
-        while IFS= read -r line || [ -n "$line" ]; do
-          case "$line" in ""|"#"*) continue ;; esac
-          export "$line"
-        done < ${home}/Dev/9router/.env
-        exec ${lib.getExe ninerouter}
-      '' ];
+      ProgramArguments = [ (lib.getExe envFileExec) ninerouterEnvFile maxWaitSeconds (lib.getExe ninerouter) ];
       RunAtLoad = true;
       KeepAlive = true;
       EnvironmentVariables = {
@@ -105,22 +108,26 @@ in
       StandardErrorPath = "${home}/Library/Logs/9router.log";
     };
 
-  # Shell secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
-  # renders secrets/shell.env.tpl (1Password references only) through the saved
-  # 2password service account into shellEnvFile (mode 0400, folder 0700,
-  # excluded from Time Machine). A failed render keeps the last good file.
-  # `secrets-refresh` restarts the agent. Values never enter the store.
+  # Secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
+  # renders each env template (1Password references only) through the saved
+  # 2password service account into its rendered env file in secretsDir (mode
+  # 0400, folder 0700, excluded from Time Machine). A failed render keeps the
+  # last good file of that target. `secrets-refresh` restarts the agent.
+  # Values never enter the store.
   launchd.user.agents.secrets-render.serviceConfig =
     let home = config.users.users.tothemoon.home;
     in {
-      ProgramArguments = [ (lib.getExe (pkgs.callPackage ../packages/secrets-render.nix { })) ];
+      ProgramArguments = [
+        (lib.getExe (pkgs.callPackage ../packages/secrets-render.nix { }))
+        "${../secrets/shell.env.tpl}" shellEnvFile
+        "${../secrets/9router.env.tpl}" ninerouterEnvFile
+      ];
       RunAtLoad = true;
       EnvironmentVariables = {
         HOME = home;
-        RENDER_TEMPLATE = "${../secrets/shell.env.tpl}";
-        RENDER_TARGET = shellEnvFile;
         # Fresh values on every render, also from a long-running op daemon. One
-        # uncached render costs 1 service-account read request (measured 2026-10-24).
+        # uncached render costs 1 service-account read request per template
+        # (measured 2026-10-24).
         OP_CACHE = "false";
         # op from the Homebrew 1password-cli cask; osascript (Keychain) and tmutil.
         PATH = "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin";
