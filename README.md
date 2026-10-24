@@ -83,4 +83,3 @@ These parts are not done or not verified yet:
 - No CI job runs inside devenv yet (#23 to #25).
 - Homebrew is not declared in nix-darwin yet (#16 to #22).
 - Bayland dev and staging do not read rendered env files yet (#5).
-- The repository is still private, so the credential-free `github:FasalZein/nix-platform` fetch is not verified (#7).
