@@ -2,7 +2,7 @@
 
 Machine config for MacBook-Pro-2 (nix-darwin + home-manager, Lix), plus a shared overlay and devenv module for every repository.
 
-Plan and decisions: `~/.pi/artifacts/nix-plan/nix-migration-plan-20261021.md`.
+Plan and decisions: `docs/specs/nix-phase2.md` and `docs/adr/`; tickets are GitHub issues.
 
 ## First install (run by hand; needs sudo)
 
@@ -59,4 +59,13 @@ Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv
 
 ## Not verified yet
 
-Nix is not installed, so this flake has not been evaluated. Expect small fixes on the first switch (option or package names).
+State on 2026-10-24. The first install and stage 2 are done: Lix 2.95.4 runs, and the active system is the `main` configuration. `nix flake check` passes (10 checks). The shell, 9router and ymcq dev env files render at login.
+
+These parts are not done or not verified yet:
+
+- Phase-2 repos do not use the devenv module yet (#9 to #15). Only Bayland portfolio and trading-platform import it today.
+- The overlay has Node 24 only. Node 22 and its security pin come with #8. The x86_64-linux build of that pin is proven only by the first CI run that uses it.
+- No CI job runs inside devenv yet (#23 to #25).
+- Homebrew is not declared in nix-darwin yet (#16 to #22).
+- Bayland dev and staging do not read rendered env files yet (#5).
+- The repository is still private, so the credential-free `github:FasalZein/nix-platform` fetch is not verified (#7).
