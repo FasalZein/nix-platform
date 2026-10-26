@@ -155,6 +155,15 @@ in
     };
   };
 
+  # Key-only SSH login to this Mac (owner decision 2026-10-26). Remote Login listens on
+  # every network, including public Wi-Fi; phone access (Moshi pairing keys, then mosh)
+  # and agents use keys. sshd takes the first value per option, and 100-macos.conf
+  # sets neither option, so these win.
+  services.openssh.extraConfig = ''
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+  '';
+
   # On-demand builder (owner decision 2026-10-24): the VM no longer runs while
   # idle. The first ssh to linux-builder (nix-daemon dispatching an
   # aarch64-linux build) starts it through the ProxyCommand below and waits
