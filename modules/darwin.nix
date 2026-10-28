@@ -109,6 +109,80 @@ in
       StandardErrorPath = "${home}/Library/Logs/9router.log";
     };
 
+  # Dev Postgres for bayland-portfolio-v1 on localhost:5433, native instead of
+  # Docker/OrbStack (owner decision 2026-10-28: OrbStack's Docker hung after a
+  # lid close). Label org.nixos.postgresql (nix-darwin services.postgresql, a
+  # user agent: RunAtLoad, KeepAlive). Its first start runs initdb. The
+  # data folder is outside every repo and keeps the major in its name, so a
+  # new major gets a new folder (pg_upgrade or dump/restore). Settings replace
+  # postgresql.conf on every start; ALTER SYSTEM still works through
+  # postgresql.auto.conf. The module also adds psql, pg_dump and the other
+  # client tools to the system profile.
+  services.postgresql =
+    let home = config.users.users.tothemoon.home;
+    in {
+      enable = true;
+      # postgresql_17 through the overlay; expected-versions.nix pins 17.11.
+      package = pkgs.postgresql;
+      port = 5433;
+      dataDir = "${home}/.local/state/nix-platform/postgresql-17";
+      initdbArgs = [
+        # Dev-only password 'postgres', the one every repo doc URL uses
+        # (postgresql://postgres:postgres@localhost:5433/postgres). It is no
+        # secret, so a store file is fine here.
+        "--pwfile=${pkgs.writeText "postgres-dev-password" "postgres"}"
+        "--auth-host=scram-sha-256"
+        # The Docker cluster is UTF8 with glibc en_US.utf8 collation. macOS libc
+        # en_US.UTF-8 collates near byte order, so ICU en-US is the closer match.
+        "--encoding=UTF8"
+        "--locale=en_US.UTF-8"
+        "--locale-provider=icu"
+        "--icu-locale=en-US"
+      ];
+      # Above the module's defaults (local peer, host md5). enableTCPIP stays
+      # false: listen_addresses = localhost (127.0.0.1 and ::1) only.
+      authentication = ''
+        host all all 127.0.0.1/32 scram-sha-256
+        host all all ::1/128      scram-sha-256
+      '';
+      # Timestamps in each line: the module default "[%p] " expects journald.
+      logLinePrefix = "%m [%p] ";
+      settings = {
+        # Logging as docker-compose.yml in bayland-portfolio-v1 declares it:
+        # files in <dataDir>/pg_log, daily rotation, statements over 1 s.
+        logging_collector = true;
+        log_directory = "pg_log";
+        log_filename = "postgresql-%Y-%m-%d_%H%M%S.log";
+        log_rotation_age = "1d";
+        log_rotation_size = "100MB";
+        log_truncate_on_rotation = true;
+        log_min_duration_statement = 1000;
+        # Values the Docker cluster has (read 2026-10-28). initdb writes the
+        # locale and time zone lines into postgresql.conf, which the module
+        # replaces, so they are set here.
+        TimeZone = "Etc/UTC";
+        log_timezone = "Etc/UTC";
+        DateStyle = "ISO, MDY";
+        lc_messages = "en_US.UTF-8";
+        lc_monetary = "en_US.UTF-8";
+        lc_numeric = "en_US.UTF-8";
+        lc_time = "en_US.UTF-8";
+        default_text_search_config = "pg_catalog.english";
+        max_connections = 100;
+        shared_buffers = "128MB";
+        max_wal_size = "1GB";
+        min_wal_size = "80MB";
+      };
+    };
+  # Start-up errors before the logging collector runs (a busy port, a bad
+  # data folder) go here; launchd retries every 10 s while KeepAlive holds.
+  launchd.user.agents.postgresql.serviceConfig =
+    let home = config.users.users.tothemoon.home;
+    in {
+      StandardOutPath = "${home}/Library/Logs/postgresql.log";
+      StandardErrorPath = "${home}/Library/Logs/postgresql.log";
+    };
+
   # Secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
   # renders each env template (1Password references only) through the saved
   # 2password service account into its rendered env file in secretsDir (mode

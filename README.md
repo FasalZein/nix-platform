@@ -71,6 +71,7 @@ Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv
 - Apply a change: `sudo darwin-rebuild switch --flake ~/Dev/nix-platform#MacBook-Pro-2`
 - Roll back: `sudo darwin-rebuild --rollback`
 - Update inputs: `nix flake update`, then switch. Commit `flake.lock`.
+- Dev Postgres 17 (bayland-portfolio-v1): launchd agent `org.nixos.postgresql` on localhost:5433, URL `postgresql://postgres:postgres@localhost:5433/postgres`. Data in `~/.local/state/nix-platform/postgresql-17`, server logs in its `pg_log`, start-up errors in `~/Library/Logs/postgresql.log`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.postgresql`.
 
 ## Not verified yet
 
