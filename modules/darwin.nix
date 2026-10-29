@@ -297,7 +297,12 @@ in
   # dirs use 1200). Missing commands (timeout, nproc) resolve to GNU; stat,
   # date and mktemp keep their BSD flags. Not in a profile, so it stays last.
   # Globals from `npm i -g` (NPM_CONFIG_PREFIX above) come just before it.
+  # ~/.pi/agent/bin holds the agent tools every repo uses (heavy, wt, ralph-lane).
+  # pi adds it only to its own env; a pi started in a direnv-loaded shell loses it
+  # when env-wrap restores the pre-direnv PATH. Home Manager zsh integration is off,
+  # so home.sessionPath would not reach shells; systemPath reaches every zsh.
   environment.systemPath = lib.mkAfter [
+    "${config.users.users.tothemoon.home}/.pi/agent/bin"
     "${config.users.users.tothemoon.home}/.npm-global/bin"
     "${pkgs.coreutils}/bin"
   ];
