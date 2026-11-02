@@ -34,7 +34,7 @@
       secrets-refresh = pkgs.callPackage ./packages/secrets-refresh.nix { };
       # Run by the 9router launchd agent in modules/darwin.nix.
       env-file-exec = pkgs.callPackage ./packages/env-file-exec.nix { };
-      # Draft (spike): SuperTokens core for a later launchd agent.
+      # Run by the supertokens launchd agent in modules/darwin.nix.
       supertokens = pkgs.callPackage ./packages/supertokens.nix { };
     };
 
@@ -77,6 +77,9 @@
       secrets-render = self.packages.${system}.secrets-render;
       secrets-refresh = self.packages.${system}.secrets-refresh;
       env-file-exec = self.packages.${system}.env-file-exec;
+      # Builds the package; the image digest and hash pin the core version, and
+      # the build fails when version.yaml names another core version.
+      supertokens = self.packages.${system}.supertokens;
       # Several templates in one run, against fake 2password and tmutil: each
       # target renders atomically with mode 0400, a failing template keeps its
       # last good file while the others render, and the log holds no value.
