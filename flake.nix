@@ -34,6 +34,10 @@
       secrets-refresh = pkgs.callPackage ./packages/secrets-refresh.nix { };
       # Run by the 9router launchd agent in modules/darwin.nix.
       env-file-exec = pkgs.callPackage ./packages/env-file-exec.nix { };
+      # Run by the supertokens-log-cap launchd agent in modules/darwin.nix.
+      log-size-cap = pkgs.callPackage ./packages/log-size-cap.nix { };
+      # Run by the supertokens launchd agent in modules/darwin.nix.
+      supertokens = pkgs.callPackage ./packages/supertokens.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -75,6 +79,36 @@
       secrets-render = self.packages.${system}.secrets-render;
       secrets-refresh = self.packages.${system}.secrets-refresh;
       env-file-exec = self.packages.${system}.env-file-exec;
+      # Builds the package; the image digest and hash pin the core version, and
+      # the build fails when version.yaml names another core version.
+      supertokens = self.packages.${system}.supertokens;
+      # A file over the limit is emptied in place (same inode) and gets one
+      # marker line; a writer that holds an O_APPEND handle (as launchd's
+      # StandardOutPath) keeps writing at the new end; a file at or under the
+      # limit and a missing file stay untouched.
+      log-size-cap = pkgs.runCommand "log-size-cap" { } ''
+        run=${pkgs.lib.getExe self.packages.${system}.log-size-cap}
+        size() { stat -c %s "$1"; }
+        head -c 2000 /dev/zero > $TMPDIR/big.log
+        head -c 1000 /dev/zero > $TMPDIR/limit.log
+        head -c 10 /dev/zero > $TMPDIR/small.log
+        inode=$(stat -c %i $TMPDIR/big.log)
+        exec 3>> $TMPDIR/big.log
+        $run 1000 $TMPDIR/big.log $TMPDIR/limit.log $TMPDIR/small.log $TMPDIR/missing.log
+        [ "$(stat -c %i $TMPDIR/big.log)" = "$inode" ]
+        [ "$(wc -l < $TMPDIR/big.log)" = 1 ]
+        grep -q "log-size-cap: truncated $TMPDIR/big.log at 2000 bytes (limit 1000)" $TMPDIR/big.log
+        marker=$(size $TMPDIR/big.log)
+        echo after >&3
+        exec 3>&-
+        [ "$(size $TMPDIR/big.log)" = $((marker + 6)) ]
+        [ "$(tail -n 1 $TMPDIR/big.log)" = after ]
+        [ "$(size $TMPDIR/limit.log)" = 1000 ] && [ "$(size $TMPDIR/small.log)" = 10 ]
+        [ ! -e $TMPDIR/missing.log ]
+        if $run 1000 2> $TMPDIR/err; then exit 1; fi
+        grep -q usage $TMPDIR/err
+        touch $out
+      '';
       # Several templates in one run, against fake 2password and tmutil: each
       # target renders atomically with mode 0400, a failing template keeps its
       # last good file while the others render, and the log holds no value.

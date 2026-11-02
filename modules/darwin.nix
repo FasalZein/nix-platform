@@ -183,6 +183,87 @@ in
       StandardErrorPath = "${home}/Library/Logs/postgresql.log";
     };
 
+  # SuperTokens core (auth service of bayland-platform) on 127.0.0.1:3567,
+  # native instead of OrbStack (owner decision 2026-11-02). Label
+  # org.nixos.supertokens. It stores its data in the `supertokens` database of
+  # the Postgres above. The config lives in the store: the values match
+  # bayland-platform docker/local/supertokens/config.yaml (the container's
+  # effective config on 2026-11-02), with these changes: host 127.0.0.1 (the
+  # container listened on 0.0.0.0 inside its own network), Postgres on
+  # localhost:5433, and logs on stdout ("null"), so launchd writes them to the
+  # log file. api_keys must equal SUPERTOKENS_API_KEY in bayland-platform
+  # apps/api/start_server.py. The API key and the password are local dev
+  # values from that repo, no secrets.
+  # Start order: when Postgres is not ready, the core does not exit. It tries
+  # again about every 10 s for up to 60 minutes and opens its port when the
+  # database answers (tested 2026-11-02). If it gives up and exits, KeepAlive
+  # starts it again after launchd's 10 s throttle.
+  # Cutover prerequisite: bayland-platform scripts/local-infra-up.sh and
+  # compose.local.yml start the OrbStack container bayland-platform-supertokens-local
+  # on the same port 3567. Land the bayland-platform change that stops them
+  # first, then stop the container, then switch. Keep the container only for
+  # rollback.
+  launchd.user.agents.supertokens.serviceConfig =
+    let
+      home = config.users.users.tothemoon.home;
+      supertokens = pkgs.callPackage ../packages/supertokens.nix { };
+      supertokensConfig = pkgs.writeText "supertokens-config.yaml" ''
+        core_config_version: 0
+        port: 3567
+        host: "127.0.0.1"
+        api_keys: "changeme-supertokens-api-key"
+        disable_telemetry: true
+        info_log_path: "null"
+        error_log_path: "null"
+
+        postgresql_config_version: 0
+        postgresql_host: "localhost"
+        postgresql_port: ${toString config.services.postgresql.port}
+        postgresql_user: "postgres"
+        postgresql_password: "postgres"
+        postgresql_database_name: "supertokens"
+      '';
+    in {
+      ProgramArguments = [ (lib.getExe supertokens) "${supertokensConfig}" ];
+      RunAtLoad = true;
+      KeepAlive = true;
+      EnvironmentVariables = {
+        HOME = home;
+        # Writable install folder, Java temp files and JNA libraries; outside
+        # every repo. launchd does not expand $HOME, so the path is absolute.
+        SUPERTOKENS_STATE_DIR = "${home}/.local/state/nix-platform/supertokens";
+        # mkdir and ln for the wrapper script.
+        PATH = "/usr/bin:/bin";
+      };
+      StandardOutPath = "${home}/Library/Logs/supertokens.log";
+      StandardErrorPath = "${home}/Library/Logs/supertokens.log";
+    };
+
+  # Size cap for supertokens.log (owner decision 2026-11-02): every hour the
+  # agent empties the file in place when it is larger than 100 MB and keeps
+  # no old copy. 100 MB is log_rotation_size of services.postgresql above;
+  # 3600 s is the StartInterval of worktree-idle-sweep (owner decision
+  # 2026-10-23). The core logs little in normal use (the container wrote 14
+  # lines, about 1 KB, in its first 1.5 h); growth comes mainly from retry
+  # error traces while Postgres is down. 9router.log could use the same agent
+  # later. Label org.nixos.supertokens-log-cap.
+  launchd.user.agents.supertokens-log-cap.serviceConfig =
+    let
+      home = config.users.users.tothemoon.home;
+      maxBytes = toString (100 * 1024 * 1024);
+    in {
+      ProgramArguments = [
+        (lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { }))
+        maxBytes
+        "${home}/Library/Logs/supertokens.log"
+      ];
+      StartInterval = 3600;
+      ProcessType = "Background";
+      LowPriorityIO = true;
+      # Errors only (the script prints nothing on success).
+      StandardErrorPath = "${home}/Library/Logs/supertokens-log-cap.log";
+    };
+
   # Secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
   # renders each env template (1Password references only) through the saved
   # 2password service account into its rendered env file in secretsDir (mode
