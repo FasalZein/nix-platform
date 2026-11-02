@@ -198,6 +198,11 @@ in
   # again about every 10 s for up to 60 minutes and opens its port when the
   # database answers (tested 2026-11-02). If it gives up and exits, KeepAlive
   # starts it again after launchd's 10 s throttle.
+  # Cutover prerequisite: bayland-platform scripts/local-infra-up.sh and
+  # compose.local.yml start the OrbStack container bayland-platform-supertokens-local
+  # on the same port 3567. Land the bayland-platform change that stops them
+  # first, then stop the container, then switch. Keep the container only for
+  # rollback.
   launchd.user.agents.supertokens.serviceConfig =
     let
       home = config.users.users.tothemoon.home;

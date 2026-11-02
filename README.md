@@ -72,7 +72,7 @@ Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv
 - Roll back: `sudo darwin-rebuild --rollback`
 - Update inputs: `nix flake update`, then switch. Commit `flake.lock`.
 - Dev Postgres 17 (bayland-portfolio-v1): launchd agent `org.nixos.postgresql` on localhost:5433, URL `postgresql://postgres:postgres@localhost:5433/postgres`. Data in `~/.local/state/nix-platform/postgresql-17`, server logs in its `pg_log`, start-up errors in `~/Library/Logs/postgresql.log`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.postgresql`.
-- SuperTokens core 11.4.3 (bayland-platform auth): launchd agent `org.nixos.supertokens` on 127.0.0.1:3567, data in the `supertokens` database of that Postgres, logs in `~/Library/Logs/supertokens.log`, run-time files in `~/.local/state/nix-platform/supertokens`. Check: `curl localhost:3567/hello`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.supertokens`.
+- SuperTokens core 11.4.3 (bayland-platform auth): launchd agent `org.nixos.supertokens` on 127.0.0.1:3567, data in the `supertokens` database of that Postgres, logs in `~/Library/Logs/supertokens.log`, run-time files in `~/.local/state/nix-platform/supertokens`. Check: `curl localhost:3567/hello`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.supertokens`. Before the first switch with this agent: land the bayland-platform change that stops `scripts/local-infra-up.sh` and `compose.local.yml` from starting the SuperTokens container (same port), then `docker stop bayland-platform-supertokens-local`.
 
 ## Not verified yet
 
