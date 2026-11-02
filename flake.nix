@@ -34,6 +34,8 @@
       secrets-refresh = pkgs.callPackage ./packages/secrets-refresh.nix { };
       # Run by the 9router launchd agent in modules/darwin.nix.
       env-file-exec = pkgs.callPackage ./packages/env-file-exec.nix { };
+      # Draft (spike): SuperTokens core for a later launchd agent.
+      supertokens = pkgs.callPackage ./packages/supertokens.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
