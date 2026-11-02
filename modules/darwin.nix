@@ -239,6 +239,31 @@ in
       StandardErrorPath = "${home}/Library/Logs/supertokens.log";
     };
 
+  # Size cap for supertokens.log (owner decision 2026-11-02): every hour the
+  # agent empties the file in place when it is larger than 100 MB and keeps
+  # no old copy. 100 MB is log_rotation_size of services.postgresql above;
+  # 3600 s is the StartInterval of worktree-idle-sweep (owner decision
+  # 2026-10-23). The core logs little in normal use (the container wrote 14
+  # lines, about 1 KB, in its first 1.5 h); growth comes mainly from retry
+  # error traces while Postgres is down. 9router.log could use the same agent
+  # later. Label org.nixos.supertokens-log-cap.
+  launchd.user.agents.supertokens-log-cap.serviceConfig =
+    let
+      home = config.users.users.tothemoon.home;
+      maxBytes = toString (100 * 1024 * 1024);
+    in {
+      ProgramArguments = [
+        (lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { }))
+        maxBytes
+        "${home}/Library/Logs/supertokens.log"
+      ];
+      StartInterval = 3600;
+      ProcessType = "Background";
+      LowPriorityIO = true;
+      # Errors only (the script prints nothing on success).
+      StandardErrorPath = "${home}/Library/Logs/supertokens-log-cap.log";
+    };
+
   # Secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
   # renders each env template (1Password references only) through the saved
   # 2password service account into its rendered env file in secretsDir (mode
