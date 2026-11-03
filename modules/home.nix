@@ -31,5 +31,8 @@
     enable = true;
     enableZshIntegration = false;
     nix-direnv.enable = true;
+    # Writes ~/.config/direnv/direnv.toml. disable_stdin points .envrc stdin at
+    # /dev/null, so a slow devenv eval cannot read keys typed into a new pane (#28).
+    config.global.disable_stdin = true;
   };
 }
