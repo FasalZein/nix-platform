@@ -38,6 +38,8 @@
       log-size-cap = pkgs.callPackage ./packages/log-size-cap.nix { };
       # Run by the supertokens launchd agent in modules/darwin.nix.
       supertokens = pkgs.callPackage ./packages/supertokens.nix { };
+      # Run by the memory-sampler launchd agent in modules/darwin.nix.
+      memory-sampler = pkgs.callPackage ./packages/memory-sampler.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -86,6 +88,42 @@
       # marker line; a writer that holds an O_APPEND handle (as launchd's
       # StandardOutPath) keeps writing at the new end; a file at or under the
       # limit and a missing file stay untouched.
+      # Against fake memory_pressure, sysctl and ps: one line with free %, swap
+      # used and the 10 largest processes by RSS (base name, pid, MiB), in RSS
+      # order; a log at the limit stays, a log over it moves to <log>.1 and a
+      # new log starts; wrong arguments give usage and exit 64.
+      memory-sampler = pkgs.runCommand "memory-sampler" { } ''
+        run=${pkgs.lib.getExe self.packages.${system}.memory-sampler}
+        mkdir $TMPDIR/bin
+        printf '%s\n' '#!/bin/sh' \
+          'echo "The system has 51539607552 (3145728 pages with a page size of 16384)."' \
+          'echo "System-wide memory free percentage: 42%"' > $TMPDIR/bin/memory_pressure
+        printf '%s\n' '#!/bin/sh' \
+          'echo "total = 4096.00M  used = 2615.06M  free = 1480.94M  (encrypted)"' > $TMPDIR/bin/sysctl
+        {
+          echo '#!/bin/sh'
+          echo 'cat <<EOF'
+          echo '  2048   7 /usr/libexec/small'
+          for i in 1 2 3 4 5 6 7 8 9 10; do echo "$((i * 10240)) $((100 + i)) /Applications/A B.app/p$i"; done
+          echo 'EOF'
+        } > $TMPDIR/bin/ps
+        chmod +x $TMPDIR/bin/*
+        export PATH=$TMPDIR/bin:$PATH
+        log=$TMPDIR/m.log
+        $run $log 1000000
+        [ "$(wc -l < $log)" = 1 ]
+        line=$(cat $log)
+        grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4} ' $log
+        [ "''${line#* }" = 'free=42% swap_used=2615.06M top_rss=p10[110]=100M,p9[109]=90M,p8[108]=80M,p7[107]=70M,p6[106]=60M,p5[105]=50M,p4[104]=40M,p3[103]=30M,p2[102]=20M,p1[101]=10M' ]
+        size=$(stat -c %s $log)
+        $run $log $size
+        [ "$(wc -l < $log)" = 2 ] && [ ! -e $log.1 ]
+        $run $log $((size * 2 - 1))
+        [ "$(wc -l < $log)" = 1 ] && [ "$(wc -l < $log.1)" = 2 ]
+        if $run $log 2> $TMPDIR/err; then exit 1; else [ $? = 64 ]; fi
+        grep -q usage $TMPDIR/err
+        touch $out
+      '';
       log-size-cap = pkgs.runCommand "log-size-cap" { } ''
         run=${pkgs.lib.getExe self.packages.${system}.log-size-cap}
         size() { stat -c %s "$1"; }

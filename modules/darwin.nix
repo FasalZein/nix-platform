@@ -264,6 +264,34 @@ in
       StandardErrorPath = "${home}/Library/Logs/supertokens-log-cap.log";
     };
 
+  # Memory history (issue #27): on 2026-11-03 at 12:13 many apps and agents
+  # died and no memory record existed to rule memory in or out. Label
+  # org.nixos.memory-sampler. Every 30 s the agent appends one line (time,
+  # memory_pressure free %, swap used, top 10 processes by RSS) to
+  # memory-sampler.log. One run takes about 0.05 s wall time and 0.05 s CPU
+  # (measured 2026-11-03). One line is about 350 bytes, so about 1 MB a day.
+  # A log over 10 MB moves to memory-sampler.log.1 (one old copy), which keeps
+  # 10 to 20 days. launchd skips runs while the Mac sleeps.
+  launchd.user.agents.memory-sampler.serviceConfig =
+    let
+      home = config.users.users.tothemoon.home;
+      maxBytes = toString (10 * 1024 * 1024);
+    in {
+      ProgramArguments = [
+        (lib.getExe (pkgs.callPackage ../packages/memory-sampler.nix { }))
+        "${home}/Library/Logs/memory-sampler.log"
+        maxBytes
+      ];
+      RunAtLoad = true;
+      StartInterval = 30;
+      ProcessType = "Background";
+      LowPriorityIO = true;
+      # memory_pressure and ps in /usr/bin and /bin, sysctl in /usr/sbin.
+      EnvironmentVariables.PATH = "/usr/bin:/bin:/usr/sbin";
+      # Errors only (samples go to the log file named above).
+      StandardErrorPath = "${home}/Library/Logs/memory-sampler-error.log";
+    };
+
   # Secrets (ADR 0001). Label org.nixos.secrets-render. At login the agent
   # renders each env template (1Password references only) through the saved
   # 2password service account into its rendered env file in secretsDir (mode

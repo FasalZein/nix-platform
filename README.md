@@ -74,6 +74,8 @@ Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv
 - Dev Postgres 17 (bayland-portfolio-v1): launchd agent `org.nixos.postgresql` on localhost:5433, URL `postgresql://postgres:postgres@localhost:5433/postgres`. Data in `~/.local/state/nix-platform/postgresql-17`, server logs in its `pg_log`, start-up errors in `~/Library/Logs/postgresql.log`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.postgresql`.
 - SuperTokens core 11.4.3 (bayland-platform auth): launchd agent `org.nixos.supertokens` on 127.0.0.1:3567, data in the `supertokens` database of that Postgres, logs in `~/Library/Logs/supertokens.log`, run-time files in `~/.local/state/nix-platform/supertokens`. Check: `curl localhost:3567/hello`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.supertokens`. Before the first switch with this agent: land the bayland-platform change that stops `scripts/local-infra-up.sh` and `compose.local.yml` from starting the SuperTokens container (same port), then `docker stop bayland-platform-supertokens-local`.
 
+- Memory history: launchd agent `org.nixos.memory-sampler` appends one line every 30 s to `~/Library/Logs/memory-sampler.log`: local time, `free=` (memory_pressure free %), `swap_used=`, and `top_rss=` (10 largest processes as `name[pid]=MiB`). Over 10 MB the log moves to `memory-sampler.log.1` (one old copy). Read a time window: `rg '^2026-11-03T12:1' ~/Library/Logs/memory-sampler.log*`. Errors go to `~/Library/Logs/memory-sampler-error.log`.
+
 ## Not verified yet
 
 State on 2026-10-24. The first install and stage 2 are done: Lix 2.95.4 runs, and the active system is the `main` configuration. `nix flake check` passes (10 checks). The shell, 9router and ymcq dev env files render at login.
