@@ -417,8 +417,11 @@ in
     WT_ROOT = wtRoot;
   };
 
-  # Creates WT_ROOT (owned by the user) at every switch. Activation runs as
-  # root. A symlink or a folder on another volume is left alone with a
+  # Creates WT_ROOT at every switch. Activation runs as root, but mkdir runs
+  # as the user (sudo, as nix-darwin's home-manager step does), so no root
+  # operation acts on a path the user can swap for a symlink (no root chown).
+  # A symlink, a folder owned by another user (for example root after an
+  # interrupted switch) or a folder on another volume is left alone with a
   # warning: clonefile(2) and pnpm clones need the volume of the home folder.
   # Spotlight: no declarative exclusion passed the mdfind check on macOS 27.0
   # (2026-11-10). Each probe was a new folder under ~ with one uniquely named
@@ -435,13 +438,19 @@ in
   #   which mds owns; editing it was not tested. Manual step in README.md.
   system.activationScripts.postActivation.text = ''
     wt_root=${lib.escapeShellArg wtRoot}
-    home_dir=${lib.escapeShellArg config.users.users.tothemoon.home}
+    wt_user=${lib.escapeShellArg config.system.primaryUser}
+    home_dir=${lib.escapeShellArg config.users.users.${config.system.primaryUser}.home}
+    as_user=(/usr/bin/sudo --user="$wt_user" --set-home)
+    if [ ! -e "$wt_root" ] && [ ! -L "$wt_root" ]; then
+      "''${as_user[@]}" /bin/mkdir -m 0755 "$wt_root" \
+        || echo "warning: could not create $wt_root as $wt_user" >&2
+    fi
     if [ -L "$wt_root" ]; then
       echo "warning: $wt_root is a symlink; WT_ROOT must be a real folder on the home volume" >&2
-    else
-      if [ ! -d "$wt_root" ]; then
-        /bin/mkdir -m 0755 "$wt_root"
-        /usr/sbin/chown tothemoon:staff "$wt_root"
+    elif [ -d "$wt_root" ]; then
+      owner=$(/usr/bin/stat -f %Su "$wt_root")
+      if [ "$owner" != "$wt_user" ]; then
+        echo "warning: $wt_root is owned by $owner, not $wt_user; fix: sudo chown $wt_user:staff $wt_root" >&2
       fi
       if [ "$(/usr/bin/stat -f %d "$wt_root")" != "$(/usr/bin/stat -f %d "$home_dir")" ]; then
         echo "warning: $wt_root is on another volume than $home_dir; clonefile will fail (EXDEV)" >&2

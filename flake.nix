@@ -128,8 +128,9 @@
       '';
       # A directory with a file and a relative symlink clones to an equal tree
       # (no output, exit 0) whose files are separate copies; an existing DST,
-      # a missing SRC and a symlink SRC each fail with one stderr line and
-      # leave no DST; wrong arguments give usage and exit 64. EXDEV and
+      # a missing SRC and a symlink SRC (also with trailing slashes) each fail
+      # with one stderr line and leave no DST; wrong arguments give usage and
+      # exit 64. EXDEV and
       # ENOTSUP need a second volume (hdiutil), so they are checked by hand.
       wt-clonefile = pkgs.runCommand "wt-clonefile" { } ''
         run=${pkgs.lib.getExe self.packages.${system}.wt-clonefile}
@@ -147,8 +148,11 @@
         fails none x
         grep -q 'No such file or directory' err && [ ! -e x ]
         ln -s src srclink
-        fails srclink y
-        grep -q 'Not a directory' err && [ ! -e y ]
+        # A trailing slash must not make lstat follow the top-level symlink.
+        for s in srclink srclink/ srclink//; do
+          fails "$s" y
+          grep -q 'Not a directory' err && [ ! -e y ]
+        done
         for args in "" "a b c"; do
           # shellcheck disable=SC2086
           if "$run" $args 2> err; then exit 1; else [ $? = 64 ]; fi

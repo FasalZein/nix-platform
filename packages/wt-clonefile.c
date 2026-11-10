@@ -16,9 +16,12 @@ int main(int argc, char **argv) {
     fputs("usage: wt-clonefile SRC DST\n", stderr);
     return EX_USAGE;
   }
-  const char *src = argv[1], *dst = argv[2];
+  char *src = argv[1];
+  const char *dst = argv[2];
   struct stat st;
   int rc;
+  // lstat("link/") follows the link, so trailing slashes go first ("/" stays).
+  for (size_t n = strlen(src); n > 1 && src[n - 1] == '/'; n--) src[n - 1] = '\0';
   // A top-level symlink is not followed: lstat SRC, and SRC itself must be a
   // directory. clonefile keeps its default flags (0).
   if (lstat(src, &st) != 0) rc = -1;
