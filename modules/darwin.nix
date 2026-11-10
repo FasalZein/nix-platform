@@ -21,6 +21,9 @@ let
   # pnpm's per-file clones work only within one volume.
   wtRoot = "${config.users.users.tothemoon.home}/Worktrees";
   wtClonefile = pkgs.callPackage ../packages/wt-clonefile.nix { };
+
+  # TLC engine for pstack's statechart skill (issue #29); tla-ts-174 pins TLC 1.7.4.
+  tlaTs = pkgs.callPackage ../packages/tla-ts.nix { };
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -331,6 +334,8 @@ in
     (pkgs.callPackage ../packages/secrets-refresh.nix { })
     # `wt-clonefile SRC DST`: whole-directory clonefile(2), for `wt new`.
     wtClonefile
+    # tla-ts and tla-ts-174 (issue #29).
+    tlaTs
   ];
   # /etc/zshenv runs for every zsh, interactive or not; ~/.zshenv and ~/.zshrc stay untouched.
   programs.zsh.shellInit = builtins.replaceStrings [ "@shellEnvFile@" ] [ shellEnvFile ]
@@ -415,6 +420,20 @@ in
     # reach shells: home-manager writes hm-session-vars.sh, but its zsh
     # integration is off and no zsh startup file sources it (checked 2026-11-10).
     WT_ROOT = wtRoot;
+    # TLC engine for pstack's statechart skill (issue #29). statechart uses
+    # TLA2TOOLS as the classpath and spawns JAVA without a shell; with
+    # TLA2TOOLS set it never calls mise. tla-ts-174 ignores the jar (the
+    # 1.7.4 pin wins), so the path need not exist; it must end in .jar.
+    # Agents test that both are set in their shell (verification-briefs.md),
+    # so they are global, as WT_ROOT is, and not only in a statechart wrapper.
+    # JAVA is a generic name. Checked 2026-11-10: no script in the Nix
+    # profiles, /opt/homebrew/bin, ~/.local/bin, ~/.bun/bin or this repo reads
+    # $JAVA except supertokens-core, whose wrapper sets JAVA itself (--set).
+    # No JDK is on PATH (/usr/bin/java finds no runtime; Homebrew openjdk is
+    # keg-only). Java launchers and Gradle/Maven read JAVA_HOME or JAVACMD,
+    # which stay unset. Revisit if a tool that reads $JAVA is installed.
+    JAVA = lib.getExe' tlaTs "tla-ts-174";
+    TLA2TOOLS = "/nonexistent/tla2tools.jar";
   };
 
   # Creates WT_ROOT at every switch. Activation runs as root, but mkdir runs

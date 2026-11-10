@@ -44,6 +44,8 @@
       wt-clonefile = pkgs.callPackage ./packages/wt-clonefile.nix { };
       # Run by the worktrees-sweep launchd agent in modules/worktrees-sweep.nix.
       worktrees-sweep = pkgs.callPackage ./packages/worktrees-sweep.nix { };
+      # TLC engine for pstack statechart; installed and set as JAVA in modules/darwin.nix.
+      tla-ts = pkgs.callPackage ./packages/tla-ts.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -87,6 +89,24 @@
       env-file-exec = self.packages.${system}.env-file-exec;
       # writeShellApplication runs shellcheck on the script.
       worktrees-sweep = self.packages.${system}.worktrees-sweep;
+      # tla-ts-174 reproduces TLC 1.7.4, which pstack's corpus matches; plain
+      # tla-ts without a v1.7.4 jar reproduces TLC nightly. A parameterised
+      # action tells them apart: 1.7.4 prints `<Set line`, nightly `<Set(1) line`.
+      # Both exit 12 (TLC: invariant violated). The jar path need not exist.
+      tla-ts = pkgs.runCommand "tla-ts-check" { } ''
+        tlats=${self.packages.${system}.tla-ts}/bin
+        printf '%s\n' '---- MODULE Pick ----' 'VARIABLE x' 'Init == x = 0' \
+          "Set(v) == x = 0 /\\ x' = v" 'Next == \E v \in {1, 2} : Set(v)' \
+          'Zero == x = 0' '====' > Pick.tla
+        printf '%s\n' 'INIT Init' 'NEXT Next' 'INVARIANT Zero' > Pick.cfg
+        run() { rc=0; "$tlats/$1" -cp /nonexistent/tla2tools.jar tlc2.TLC -config Pick.cfg Pick.tla > "$1.out" 2>&1 || rc=$?; [ "$rc" = 12 ]; }
+        run tla-ts-174
+        grep -q 'Invariant Zero is violated' tla-ts-174.out
+        grep -q '^State 2: <Set line' tla-ts-174.out
+        run tla-ts
+        grep -q '^State 2: <Set(1) line' tla-ts.out
+        touch $out
+      '';
       # Builds the package; the image digest and hash pin the core version, and
       # the build fails when version.yaml names another core version.
       supertokens = self.packages.${system}.supertokens;
