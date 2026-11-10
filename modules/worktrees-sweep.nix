@@ -14,7 +14,11 @@ in
   # worktrees (D7). Label org.nix-community.home.worktrees-sweep. launchd runs
   # a missed run once after the Mac wakes.
   launchd.agents.worktrees-sweep = {
-    enable = true;
+    # Disabled (owner, 2026-11-10) until FasalZein/pi-agent-config#20 lands:
+    # worktrees-landed --remove decides once and removes later without a
+    # re-check, so a process that starts in a landed worktree can lose it.
+    # Set back to true after #20.
+    enable = false;
     config = {
       ProgramArguments = [ (lib.getExe (pkgs.callPackage ../packages/worktrees-sweep.nix { })) ];
       StartCalendarInterval = [{ Hour = 3; Minute = 30; }];
