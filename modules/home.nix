@@ -1,6 +1,8 @@
 { pkgs, ... }:
 
 {
+  imports = [ ./worktrees-sweep.nix ];
+
   home.stateVersion = "25.11";
 
   home.packages = with pkgs; [

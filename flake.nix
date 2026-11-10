@@ -42,6 +42,8 @@
       memory-sampler = pkgs.callPackage ./packages/memory-sampler.nix { };
       # Installed by environment.systemPackages in modules/darwin.nix, for `wt new`.
       wt-clonefile = pkgs.callPackage ./packages/wt-clonefile.nix { };
+      # Run by the worktrees-sweep launchd agent in modules/worktrees-sweep.nix.
+      worktrees-sweep = pkgs.callPackage ./packages/worktrees-sweep.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -83,6 +85,8 @@
       secrets-render = self.packages.${system}.secrets-render;
       secrets-refresh = self.packages.${system}.secrets-refresh;
       env-file-exec = self.packages.${system}.env-file-exec;
+      # writeShellApplication runs shellcheck on the script.
+      worktrees-sweep = self.packages.${system}.worktrees-sweep;
       # Builds the package; the image digest and hash pin the core version, and
       # the build fails when version.yaml names another core version.
       supertokens = self.packages.${system}.supertokens;
