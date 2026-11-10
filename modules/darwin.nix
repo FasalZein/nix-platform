@@ -14,6 +14,13 @@ let
   shellEnvFile = "${secretsDir}/shell.env";
   ninerouterEnvFile = "${secretsDir}/9router.env";
   ymcqDevEnvFile = "${secretsDir}/ymcq-dev.env";
+
+  # Worktree home (issue #30, spec worktree-home): new linked worktrees live
+  # here instead of ~/Dev, which Raycast, Zed, Spotlight and dev servers watch.
+  # Same APFS volume as the repos and ~/Library/pnpm/store: clonefile(2) and
+  # pnpm's per-file clones work only within one volume.
+  wtRoot = "${config.users.users.tothemoon.home}/Worktrees";
+  wtClonefile = pkgs.callPackage ../packages/wt-clonefile.nix { };
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -320,7 +327,11 @@ in
       StandardOutPath = "${home}/Library/Logs/secrets-render.log";
       StandardErrorPath = "${home}/Library/Logs/secrets-render.log";
     };
-  environment.systemPackages = [ (pkgs.callPackage ../packages/secrets-refresh.nix { }) ];
+  environment.systemPackages = [
+    (pkgs.callPackage ../packages/secrets-refresh.nix { })
+    # `wt-clonefile SRC DST`: whole-directory clonefile(2), for `wt new`.
+    wtClonefile
+  ];
   # /etc/zshenv runs for every zsh, interactive or not; ~/.zshenv and ~/.zshrc stay untouched.
   programs.zsh.shellInit = builtins.replaceStrings [ "@shellEnvFile@" ] [ shellEnvFile ]
     (builtins.readFile ../secrets/load-shell-secrets.zsh);
@@ -400,7 +411,52 @@ in
     # The Nix npm's default global prefix is inside the read-only store, so
     # `npm i -g` needs a user prefix. Homebrew globals stay where they are.
     NPM_CONFIG_PREFIX = "${config.users.users.tothemoon.home}/.npm-global";
+    # Read by `wt` and the env-wrap extension. home.sessionVariables would not
+    # reach shells: home-manager writes hm-session-vars.sh, but its zsh
+    # integration is off and no zsh startup file sources it (checked 2026-11-10).
+    WT_ROOT = wtRoot;
   };
+
+  # Creates WT_ROOT at every switch. Activation runs as root, but mkdir runs
+  # as the user (sudo, as nix-darwin's home-manager step does), so no root
+  # operation acts on a path the user can swap for a symlink (no root chown).
+  # A symlink, a folder owned by another user (for example root after an
+  # interrupted switch) or a folder on another volume is left alone with a
+  # warning: clonefile(2) and pnpm clones need the volume of the home folder.
+  # Spotlight: no declarative exclusion passed the mdfind check on macOS 27.0
+  # (2026-11-10). Each probe was a new folder under ~ with one uniquely named
+  # file; a plain folder under ~ was indexed within about 80 s (control).
+  # - .metadata_never_index file in the folder, created before the file:
+  #   indexed (mdfind found the file). Recent macOS ignores the marker.
+  # - mdutil -i off <folder>: "Error: invalid operation", exit 1; the file was
+  #   indexed. mdutil works on volumes only.
+  # - Folder name ending in .noindex: not indexed after 3 minutes. Not usable:
+  #   the root name is fixed as Worktrees (spec decision D1).
+  # - Spotlight Privacy list (System Settings): works, ~/Dev is on it and
+  #   mdfind finds no file under ~/Dev. Not declarative: the list lives in
+  #   root-only /System/Volumes/Data/.Spotlight-V100/VolumeConfiguration.plist,
+  #   which mds owns; editing it was not tested. Manual step in README.md.
+  system.activationScripts.postActivation.text = ''
+    wt_root=${lib.escapeShellArg wtRoot}
+    wt_user=${lib.escapeShellArg config.system.primaryUser}
+    home_dir=${lib.escapeShellArg config.users.users.${config.system.primaryUser}.home}
+    as_user=(/usr/bin/sudo --user="$wt_user" --set-home)
+    if [ ! -e "$wt_root" ] && [ ! -L "$wt_root" ]; then
+      "''${as_user[@]}" /bin/mkdir -m 0755 "$wt_root" \
+        || echo "warning: could not create $wt_root as $wt_user" >&2
+    fi
+    if [ -L "$wt_root" ]; then
+      echo "warning: $wt_root is a symlink; WT_ROOT must be a real folder on the home volume" >&2
+    elif [ -d "$wt_root" ]; then
+      owner=$(/usr/bin/stat -f %Su "$wt_root")
+      if [ "$owner" != "$wt_user" ]; then
+        echo "warning: $wt_root is owned by $owner, not $wt_user; fix: sudo chown $wt_user:staff $wt_root" >&2
+      fi
+      if [ "$(/usr/bin/stat -f %d "$wt_root")" != "$(/usr/bin/stat -f %d "$home_dir")" ]; then
+        echo "warning: $wt_root is on another volume than $home_dir; clonefile will fail (EXDEV)" >&2
+      fi
+    fi
+  '';
 
   # GNU coreutils after /usr/bin and /bin (mkAfter = order 1500; the system
   # dirs use 1200). Missing commands (timeout, nproc) resolve to GNU; stat,

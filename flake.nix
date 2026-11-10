@@ -40,6 +40,8 @@
       supertokens = pkgs.callPackage ./packages/supertokens.nix { };
       # Run by the memory-sampler launchd agent in modules/darwin.nix.
       memory-sampler = pkgs.callPackage ./packages/memory-sampler.nix { };
+      # Installed by environment.systemPackages in modules/darwin.nix, for `wt new`.
+      wt-clonefile = pkgs.callPackage ./packages/wt-clonefile.nix { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -122,6 +124,40 @@
         [ "$(wc -l < $log)" = 1 ] && [ "$(wc -l < $log.1)" = 2 ]
         if $run $log 2> $TMPDIR/err; then exit 1; else [ $? = 64 ]; fi
         grep -q usage $TMPDIR/err
+        touch $out
+      '';
+      # A directory with a file and a relative symlink clones to an equal tree
+      # (no output, exit 0) whose files are separate copies; an existing DST,
+      # a missing SRC and a symlink SRC (also with trailing slashes) each fail
+      # with one stderr line and leave no DST; wrong arguments give usage and
+      # exit 64. EXDEV and
+      # ENOTSUP need a second volume (hdiutil), so they are checked by hand.
+      wt-clonefile = pkgs.runCommand "wt-clonefile" { } ''
+        run=${pkgs.lib.getExe self.packages.${system}.wt-clonefile}
+        cd $TMPDIR
+        fails() { if "$run" "$@" 2> err; then echo "FAIL $* succeeded"; exit 1; fi; [ "$(wc -l < err)" = 1 ]; }
+        mkdir -p src/sub && echo x > src/sub/f && ln -s sub/f src/link
+        "$run" src dst > out 2>&1
+        [ ! -s out ]
+        diff -r --no-dereference src dst
+        [ "$(readlink dst/link)" = sub/f ]
+        echo y >> dst/sub/f
+        [ "$(cat src/sub/f)" = x ]
+        fails src dst
+        grep -qF 'wt-clonefile: clonefile src -> dst: File exists' err
+        fails none x
+        grep -q 'No such file or directory' err && [ ! -e x ]
+        ln -s src srclink
+        # A trailing slash must not make lstat follow the top-level symlink.
+        for s in srclink srclink/ srclink//; do
+          fails "$s" y
+          grep -q 'Not a directory' err && [ ! -e y ]
+        done
+        for args in "" "a b c"; do
+          # shellcheck disable=SC2086
+          if "$run" $args 2> err; then exit 1; else [ $? = 64 ]; fi
+          grep -qx 'usage: wt-clonefile SRC DST' err
+        done
         touch $out
       '';
       log-size-cap = pkgs.runCommand "log-size-cap" { } ''
