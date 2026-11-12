@@ -49,7 +49,7 @@ imports:
   - nix-platform/devenv
 ```
 
-The repo picks its Node major in `devenv.nix`: `pkgs.nodejs_22` (22.23.4) or `pkgs.nodejs_24` (24.21.0). Always set `languages.javascript.package`: without it, devenv uses `pkgs.nodejs-slim`, which has no npm and which pin-drift does not check. corepack runs the `packageManager` version from `package.json`.
+The repo picks its Node major in `devenv.nix`: `pkgs.nodejs_22` (22.23.4) or `pkgs.nodejs_24` (24.22.2). Always set `languages.javascript.package`: without it, devenv uses `pkgs.nodejs-slim`, which has no npm and which pin-drift does not check. corepack runs the `packageManager` version from `package.json`.
 
 ```nix
 { pkgs, ... }:
@@ -85,7 +85,6 @@ State on 2026-10-24. The first install and stage 2 are done: Lix 2.95.4 runs, an
 These parts are not done or not verified yet:
 
 - Phase-2 repos do not use the devenv module yet (#9 to #15). Only Bayland portfolio and trading-platform import it today.
-- The Node 22 security pin (22.23.4, #8) is built and run on aarch64-darwin and aarch64-linux only. The x86_64-linux build of that pin is proven only by the first CI run that uses it.
 - No CI job runs inside devenv yet (#23 to #25).
 - Homebrew is not declared in nix-darwin yet (#16 to #22).
 - Bayland dev and staging do not read rendered env files yet (#5).
