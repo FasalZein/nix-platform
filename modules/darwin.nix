@@ -394,9 +394,28 @@ in
   # ~/.pi/artifacts/scout/host-changes/report.md, Change 1). A function, not a
   # file on PATH: pi-agent-config's tests resolve the pi command to find pi's
   # package.
+  # restic-backup [plan]: one Backrest backup by hand; the call returns when the
+  # backup ends. The schedule of plan mac-home-nightly is disabled (owner
+  # 2026-11-17: backups run when the Mac is free). Backrest is a Homebrew
+  # service with its API on loopback; restic runs inside that daemon.
   programs.zsh.interactiveShellInit = ''
     eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
     pi() { /usr/sbin/taskpolicy -c utility "$HOME/.bun/bin/pi" "$@"; }
+    restic-backup() {
+      local plan="mac-home-nightly" out
+      [ -n "$1" ] && plan="$1"
+      if pgrep -f 'restic backup' >/dev/null; then
+        echo "restic-backup: a backup is already running"; return 1
+      fi
+      echo "restic-backup: plan $plan started at $(date +%H:%M); this call returns when the backup ends"
+      out=$(curl -sS -X POST -H 'Content-Type: application/json' -d "{\"value\":\"$plan\"}" http://127.0.0.1:9898/v1.Backrest/Backup) || {
+        echo "restic-backup: Backrest does not answer on 127.0.0.1:9898 (brew services start backrest)"; return 1
+      }
+      case "$out" in
+        *'"code"'*) echo "restic-backup: failed: $out"; return 1 ;;
+        *) echo "restic-backup: done at $(date +%H:%M)" ;;
+      esac
+    }
   '';
 
   # Nix profile dirs first in login zsh. ~/.zprofile and ~/.zshrc prepend
