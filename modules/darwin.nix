@@ -387,8 +387,16 @@ in
   };
 
   # direnv hook in /etc/zshrc, so ~/.zshrc stays untouched.
+  # pi: pi sessions and every process they start run under the utility QoS
+  # clamp, so desktop apps win when the Mac is busy; the owner's own pane
+  # commands keep normal priority. On this Mac nice gives no lower CPU share;
+  # taskpolicy -b also throttles disk and network (evidence:
+  # ~/.pi/artifacts/scout/host-changes/report.md, Change 1). A function, not a
+  # file on PATH: pi-agent-config's tests resolve the pi command to find pi's
+  # package.
   programs.zsh.interactiveShellInit = ''
     eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
+    pi() { /usr/sbin/taskpolicy -c utility "$HOME/.bun/bin/pi" "$@"; }
   '';
 
   # Nix profile dirs first in login zsh. ~/.zprofile and ~/.zshrc prepend
