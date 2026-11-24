@@ -65,17 +65,19 @@ in
 
   # Hourly (owner decision 2026-10-23): stop per-worktree devenv services, such as a
   # worktree's test Postgres, that no process uses. They start again with the next
-  # `devenv up`. Add a repo here when its devenv.nix declares services.
+  # `devenv up`. The repositories come from the running services (owner 2026-11-24):
+  # the working directory of each devenv process manager is a worktree, and git
+  # names its main checkout. A new repository needs no change here.
   launchd.user.agents.worktree-idle-sweep.serviceConfig =
     let
       home = config.users.users.tothemoon.home;
-      repos = [
-        "${home}/Dev/Bayland/bayland-portfolio-v1"
-        "${home}/Dev/fourth-root/fourth-root-portfolio"
-      ];
     in {
-      ProgramArguments = [ "/bin/bash" "-c"
-        ''for r in ${lib.escapeShellArgs repos}; do ${home}/.pi/agent/bin/worktrees-idle "$r" --stop; done'' ];
+      ProgramArguments = [ "/bin/bash" "-c" ''
+        for p in $(pgrep -f 'devenv-wrapped daemon-processes'); do lsof -a -d cwd -p "$p" -Fn | sed -n 's/^n//p'; done |
+          while IFS= read -r d; do git -C "$d" rev-parse --path-format=absolute --git-common-dir; done |
+          sed 's|/\.git$||' | sort -u |
+          while IFS= read -r r; do ${home}/.pi/agent/bin/worktrees-idle "$r" --stop; done
+      '' ];
       StartInterval = 3600;
       ProcessType = "Background";
       LowPriorityIO = true;
