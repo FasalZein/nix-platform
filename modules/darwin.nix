@@ -421,7 +421,9 @@ in
         *) echo "restic-backup: done at $(date +%H:%M)" ;;
       esac
     }
-  '';
+  '' + builtins.replaceStrings [ "@darwinVersionJson@" "@platformRepo@" ]
+    [ "/run/current-system/darwin-version.json" "${config.users.users.tothemoon.home}/Dev/nix-platform" ]
+    (builtins.readFile ./stale-system-notice.zsh);
 
   # Nix profile dirs first in login zsh. ~/.zprofile and ~/.zshrc prepend
   # Homebrew, ~/.bun/bin and ~/.local/bin after /etc/zshenv sets PATH; zsh
