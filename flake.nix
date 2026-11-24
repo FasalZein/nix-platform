@@ -327,6 +327,62 @@
         RENDERED=$TMPDIR/missing zsh -f -c 'source $TMPDIR/loader.zsh && [[ -z ''${PLAIN-} ]]'
         touch $out
       '';
+
+      # modules/stale-system-notice.zsh against fixtures: equal, different,
+      # dirty, missing repository, missing version file, null revision; HEAD
+      # from a loose ref, packed-refs, a detached HEAD and a reftable
+      # repository (the git fallback).
+      stale-system-notice = pkgs.runCommand "stale-system-notice" {
+        nativeBuildInputs = [ pkgs.git pkgs.zsh ];
+        notice = builtins.replaceStrings [ "@darwinVersionJson@" "@platformRepo@" ] [ "$JSON" "$REPO" ]
+          (builtins.readFile ./modules/stale-system-notice.zsh);
+      } ''
+        export HOME=$TMPDIR
+        printf '%s\n' "$notice" > $TMPDIR/notice.zsh
+        git init -q $TMPDIR/repo
+        git -C $TMPDIR/repo -c user.name=t -c user.email=t@t commit -q --allow-empty -m one
+        rev=$(git -C $TMPDIR/repo rev-parse HEAD)
+        short=$(printf %.7s $rev)
+        version() { printf '{\n  "configurationRevision": "%s",\n  "darwinLabel": "x"\n}\n' "$1" > $TMPDIR/v.json; }
+        # The notice's stdout and stderr; a non-zero exit shows as "rc=N".
+        run() { JSON=$1 REPO=$2 zsh -f -c 'source $TMPDIR/notice.zsh' 2>&1 || echo "rc=$?"; }
+        fail=0
+        expect() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: got [$2], want [$3]"; fail=1; fi; }
+        # HOME is TMPDIR, so the notice shows the repository as ~/repo.
+        hint="apply with: cd ~/repo && sudo darwin-rebuild switch --flake .#MacBook-Pro-2"
+        version $rev
+        expect equal "$(run $TMPDIR/v.json $TMPDIR/repo)" ""
+        version 0123456789abcdef0123456789abcdef01234567
+        expect different "$(run $TMPDIR/v.json $TMPDIR/repo)" \
+          "nix-platform: active system is 0123456, ~/repo HEAD is $short; $hint"
+        version $rev-dirty
+        expect dirty "$(run $TMPDIR/v.json $TMPDIR/repo)" \
+          "nix-platform: active system is $short-dirty, ~/repo HEAD is $short; $hint"
+        expect missing-repo "$(run $TMPDIR/v.json $TMPDIR/absent)" ""
+        expect missing-json "$(run $TMPDIR/absent.json $TMPDIR/repo)" ""
+        printf '{\n  "configurationRevision": null\n}\n' > $TMPDIR/v.json
+        expect null-revision "$(run $TMPDIR/v.json $TMPDIR/repo)" ""
+        # Each HEAD layout: equal is silent, different names the HEAD.
+        layout() {
+          version $2
+          expect "$1 equal" "$(run $TMPDIR/v.json $3)" ""
+          version 0123456789abcdef0123456789abcdef01234567
+          expect "$1 different" "$(run $TMPDIR/v.json $3)" \
+            "nix-platform: active system is 0123456, ~/''${3#$TMPDIR/} HEAD is $(printf %.7s $2); apply with: cd ~/''${3#$TMPDIR/} && sudo darwin-rebuild switch --flake .#MacBook-Pro-2"
+        }
+        git -C $TMPDIR/repo -c user.name=t -c user.email=t@t commit -q --allow-empty -m two
+        rev2=$(git -C $TMPDIR/repo rev-parse HEAD)
+        layout loose-ref $rev2 $TMPDIR/repo
+        git -C $TMPDIR/repo pack-refs --all
+        [ ! -e $TMPDIR/repo/.git/refs/heads/$(git -C $TMPDIR/repo branch --show-current) ] || { echo "FAIL fixture: ref still loose"; fail=1; }
+        layout packed-ref $rev2 $TMPDIR/repo
+        git -C $TMPDIR/repo checkout -q --detach $rev
+        layout detached $rev $TMPDIR/repo
+        git init -q --ref-format=reftable $TMPDIR/rt
+        git -C $TMPDIR/rt -c user.name=t -c user.email=t@t commit -q --allow-empty -m one
+        layout reftable $(git -C $TMPDIR/rt rev-parse HEAD) $TMPDIR/rt
+        [ $fail = 0 ] && touch $out
+      '';
     };
 
     darwinConfigurations."MacBook-Pro-2" = nix-darwin.lib.darwinSystem {
