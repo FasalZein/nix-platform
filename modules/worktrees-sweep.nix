@@ -7,28 +7,37 @@ let
 in
 {
   # Nightly at 03:30, when the owner is away (owner decision D5, spec
-  # worktree-home, issue #31): remove landed, clean, idle linked worktrees in
-  # every repo under ~/Dev and every repo with a worktree under WT_ROOT.
-  # `wt new` sweeps only its own repo, and about 70 linked worktrees built up
-  # across ~/Dev. worktrees-landed keeps dirty, busy, fresh, pushed and local
-  # worktrees (D7). Label org.nix-community.home.worktrees-sweep. launchd runs
-  # a missed run once after the Mac wakes.
+  # worktree-home, issue #31): run `worktrees-landed <repo> --remove` in every
+  # repo under ~/Dev and every repo with a worktree under WT_ROOT. `wt new`
+  # sweeps only its own repo, and about 70 linked worktrees built up across
+  # ~/Dev. Label org.nix-community.home.worktrees-sweep. launchd runs a missed
+  # run once after the Mac wakes.
   launchd.agents.worktrees-sweep = {
-    # Disabled (review 2026-11-24). #20 is fixed, but worktrees-landed --remove
-    # can still remove a worktree in use: FasalZein/pi-agent-config#52 (a
-    # session acts between the last check and the removal) and the lsof-failure
-    # case (finding 3 of ~/.pi/agent/.pi/skills/worktree-removal-verify).
-    # Enable when that skill's WorktreeRemovalWindow.cfg and
-    # WorktreeRemovalSnapFail.cfg pass and its late-change-repro.sh prints
-    # "kept" for fresh, local, busy and snapfail.
-    enable = false;
+    # Enabled (owner decision 2026-11-24). It removes only "landed" worktrees:
+    # clean, with HEAD in origin/HEAD, in origin's copy of the main checkout's
+    # branch, or in a merged PR's head commit. Only remote facts count, so a
+    # commit merged only into the local main ("unpushed") is kept. It keeps
+    # dirty, busy, fresh, pushed, local and unpushed worktrees (D7). It never
+    # stops devenv services: a worktree whose services run is kept, and the
+    # hourly worktree-idle-sweep agent (modules/darwin.nix) stops idle services,
+    # so a later night removes it. Before each removal it checks again at the
+    # path, renames the worktree to a private name, checks again there, and
+    # moves it back when anything changed; a failed lsof counts as "in use".
+    # The promise and its model check (WorktreeRemovalWindow.cfg,
+    # WorktreeRemovalSnapFail.cfg, late-change-repro.sh):
+    # ~/.pi/agent/.pi/skills/worktree-removal-verify/SKILL.md (sync commit
+    # 9c3cd45). Enabled after both configs passed and the repro printed "kept"
+    # for fresh, local, busy, snapfail, svc-late, svc-idle and unpushed on
+    # ~/.pi/agent 507b859 (#52 and finding 3 fixed).
+    enable = true;
     config = {
       ProgramArguments = [ (lib.getExe (pkgs.callPackage ../packages/worktrees-sweep.nix { })) ];
       StartCalendarInterval = [{ Hour = 3; Minute = 30; }];
       ProcessType = "Background";
       LowPriorityIO = true;
-      # git, gh (merged PRs) and devenv (devenv processes down) from the user
-      # profile; lsof from /usr/sbin. Same PATH as worktree-idle-sweep.
+      # git and gh (merged PRs) from the user profile; lsof from /usr/sbin
+      # (process snapshot), ps from /bin. The sweep runs no devenv. Same PATH
+      # as worktree-idle-sweep.
       EnvironmentVariables = {
         HOME = home;
         DEV_ROOT = "${home}/Dev";

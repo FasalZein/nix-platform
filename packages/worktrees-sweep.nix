@@ -3,8 +3,9 @@
 # worktrees built up in the other repos. This script lists every repo that has
 # linked worktrees and runs `worktrees-landed <repo> --remove` once for each.
 # The removal rules belong to worktrees-landed (pi-agent-config): it removes
-# landed, clean, idle worktrees only and keeps dirty, busy, fresh, pushed and
-# local ones. This script adds no removal rule of its own.
+# landed, clean, idle worktrees only and keeps dirty, busy, fresh, pushed,
+# local and unpushed ones and those whose devenv services run; it stops no
+# services. This script adds no removal rule of its own.
 #
 # Repos come from two sources, de-duplicated by main checkout:
 # - DEV_ROOT (default $HOME/Dev): repos with a .git directory (a .git file is a
