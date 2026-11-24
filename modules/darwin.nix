@@ -336,6 +336,8 @@ in
     wtClonefile
     # tla-ts and tla-ts-174 (issue #29).
     tlaTs
+    # ts-gate: landmines lint that the agent harness runs on each commit (report only).
+    (pkgs.callPackage ../packages/ts-gate { })
   ];
   # /etc/zshenv runs for every zsh, interactive or not; ~/.zshenv and ~/.zshrc stay untouched.
   programs.zsh.shellInit = builtins.replaceStrings [ "@shellEnvFile@" ] [ shellEnvFile ]

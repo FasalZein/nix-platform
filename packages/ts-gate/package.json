@@ -1,0 +1,10 @@
+{
+  "name": "ts-gate",
+  "version": "0.3.1",
+  "private": true,
+  "description": "Oxlint with the landmines recommended rules, for the agent harness commit gate",
+  "license": "MIT",
+  "dependencies": {
+    "@interfere/landmines": "0.3.1"
+  }
+}

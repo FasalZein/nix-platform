@@ -44,6 +44,8 @@
       worktrees-sweep = pkgs.callPackage ./packages/worktrees-sweep.nix { };
       # TLC engine for pstack statechart; installed and set as JAVA in modules/darwin.nix.
       tla-ts = pkgs.callPackage ./packages/tla-ts.nix { };
+      # Report-only landmines lint for agent commits; installed in modules/darwin.nix.
+      ts-gate = pkgs.callPackage ./packages/ts-gate { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -89,6 +91,23 @@
         grep -q '^State 2: <Set line' tla-ts-174.out
         run tla-ts
         grep -q '^State 2: <Set(1) line' tla-ts.out
+        touch $out
+      '';
+      # A test file with a vi.mock of its unit, a fixed sleep and a retry gives
+      # the three landmines rule names and exit 1; built-in Oxlint rules stay off.
+      ts-gate = pkgs.runCommand "ts-gate-check" { } ''
+        cd $TMPDIR
+        printf '%s\n' 'import { test, vi } from "vitest";' 'vi.mock("./unit");' \
+          'test("x", async () => { await new Promise((r) => setTimeout(r, 500)); }, { retry: 3 });' \
+          'debugger;' > a.test.ts
+        status=0
+        ${pkgs.lib.getExe self.packages.${system}.ts-gate} --format=unix a.test.ts > out || status=$?
+        cat out
+        [ "$status" = 1 ]
+        grep -q 'landmines(no-test-doubles)' out
+        grep -q 'landmines(no-fixed-sleep)' out
+        grep -q 'landmines(no-flake-masking)' out
+        ! grep -q 'no-debugger' out
         touch $out
       '';
       # Builds the package; the image digest and hash pin the core version, and
