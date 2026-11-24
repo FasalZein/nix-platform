@@ -1,0 +1,5 @@
+{
+  "plugins": [],
+  "categories": { "correctness": "off" },
+  "extends": ["./node_modules/@interfere/landmines/configs/recommended.json"]
+}
