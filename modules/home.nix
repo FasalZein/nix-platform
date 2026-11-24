@@ -18,6 +18,14 @@
     eza
     hyperfine
     dust
+    # Tools that ~/.pi/agent scripts and extensions call: magick (bin/shots-sheet),
+    # lazygit, yazi, ghui and lumen (extensions/pi-*), shellcheck.
+    imagemagick
+    lazygit
+    yazi
+    shellcheck
+    ghui
+    lumen
     # Pinned by overlays/default.nix (versions in expected-versions.nix).
     # Ahead of Homebrew, ~/.bun/bin and ~/.local/bin via /etc/zlogin (modules/darwin.nix).
     bun

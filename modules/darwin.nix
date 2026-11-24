@@ -343,6 +343,9 @@ in
     tlaTs
     # ts-gate: landmines lint that the agent harness runs on each commit (report only).
     (pkgs.callPackage ../packages/ts-gate { })
+    # 2password on PATH for shells and agent scripts (bin/secret-scan); the same
+    # package secrets-render runs, in place of the bun global copy.
+    (pkgs.callPackage ../packages/2password { })
   ];
   # /etc/zshenv runs for every zsh, interactive or not; ~/.zshenv and ~/.zshrc stay untouched.
   programs.zsh.shellInit = builtins.replaceStrings [ "@shellEnvFile@" ] [ shellEnvFile ]
