@@ -34,4 +34,34 @@ final: prev: {
   nodejs = final.nodejs_24;
   postgresql = final.postgresql_17;
   # uv: the nixpkgs version from flake.lock, checked against expected-versions.nix.
+
+  # ghui: the owner runs 0.9.1 (Homebrew); the locked nixpkgs ships 0.4.6. Same
+  # build (bun build:cli). Upstream ships only bun.lock, so ghui/package-lock.json
+  # is generated with `npm install --package-lock-only` from the v0.9.1 package.json
+  # (workspace:* read as *, then put back in the root entry, as nixpkgs' lock has it).
+  # buildNpmPackage computes npmDeps from its arguments, so npmDeps is set here.
+  # dev/build-cli.ts bundles @effect/sql-sqlite-bun, and bun 1.4.4 renames the
+  # `export * from "effect/unstable/sql/Migrator"` namespace in only one place:
+  # the app stops on "ReferenceError: Migrator2 is not defined" at boot. It is a
+  # runtime dependency in package.json, so it is left external like effect is.
+  ghui = prev.ghui.overrideAttrs (old: rec {
+    version = "0.9.1";
+    src = final.fetchFromGitHub {
+      owner = "kitlangton";
+      repo = "ghui";
+      tag = "v${version}";
+      hash = "sha256-K051E6+da+JZs16Kna6/Xnwhkk5b6alpC3AT/4kq4pY=";
+    };
+    postPatch = ''
+      cp ${./ghui/package-lock.json} package-lock.json
+      substituteInPlace dev/build-cli.ts \
+        --replace-fail 'external: [' 'external: ["@effect/sql-sqlite-bun", '
+    '';
+    npmDeps = final.fetchNpmDeps {
+      name = "ghui-${version}-npm-deps";
+      inherit src postPatch;
+      hash = "sha256-2i7rkQi8K/+Pq/mw3TA+Gekm3elak8m+Tiv1eVVsnZU=";
+      fetcherVersion = 2;
+    };
+  });
 }
