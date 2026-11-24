@@ -1,7 +1,7 @@
 # Pins for tools that package.json and lockfiles do not pin.
 # Rust is not here: each repo pins it in rust-toolchain.toml (devenv languages.rust.toolchainFile).
 # pnpm is not here: repos pin it in package.json "packageManager"; corepack enforces it.
-# Worker caps (VITEST_MAX_WORKERS, CARGO_BUILD_JOBS) are not here: heavy owns them.
+# Worker caps (VITEST_MAX_WORKERS, CARGO_BUILD_JOBS) are not here: modules/darwin.nix sets them in environment.variables.
 # Expected versions: ../expected-versions.nix (checked by `nix flake check`).
 final: prev: {
   # Repos pin bun@1.4.4 (security fix over 1.4.0); the locked nixpkgs ships 1.4.2. Same derivation, other release zips.

@@ -144,7 +144,7 @@ in
     let home = config.users.users.tothemoon.home;
     in {
       enable = true;
-      # postgresql_17 through the overlay; expected-versions.nix pins 17.11.
+      # postgresql_17 through the overlay; expected-versions.nix pins its version.
       package = pkgs.postgresql;
       port = 5433;
       dataDir = "${home}/.local/state/nix-platform/postgresql-17";
@@ -220,11 +220,9 @@ in
   # again about every 10 s for up to 60 minutes and opens its port when the
   # database answers (tested 2026-11-02). If it gives up and exits, KeepAlive
   # starts it again after launchd's 10 s throttle.
-  # Cutover prerequisite: bayland-platform scripts/local-infra-up.sh and
-  # compose.local.yml start the OrbStack container bayland-platform-supertokens-local
-  # on the same port 3567. Land the bayland-platform change that stops them
-  # first, then stop the container, then switch. Keep the container only for
-  # rollback.
+  # This agent replaced the OrbStack container bayland-platform-supertokens-local
+  # (same port 3567); bayland-platform scripts/local-infra-up.sh no longer
+  # starts it. Keep the container stopped, for rollback only.
   launchd.user.agents.supertokens.serviceConfig =
     let
       home = config.users.users.tothemoon.home;
@@ -451,8 +449,8 @@ in
     }
   '';
 
-  # Default caps for every shell, including agent shells. `heavy` lowers them
-  # further per slot. Without a cap each vitest run starts cores-1 workers.
+  # Default caps for every shell, including agent shells. Without a cap each
+  # vitest run starts cores-1 workers.
   environment.variables = {
     VITEST_MAX_WORKERS = "4";
     CARGO_BUILD_JOBS = "4";

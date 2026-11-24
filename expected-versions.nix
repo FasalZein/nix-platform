@@ -8,5 +8,5 @@
   nodejs_22 = "22.23.4"; # security floor (bwf-astro, bayland-platform, Bayland portfolio); nixpkgs ships it since 9397dcb
   nodejs_24 = "24.22.2"; # major 24 matches CI (actions/setup-node node-version: 24)
   uv = "0.13.7";
-  postgresql = "17.12"; # major 17 matches the Homebrew server that holds today's data
+  postgresql = "17.12"; # major 17 matches the data folder of org.nixos.postgresql (modules/darwin.nix)
 }
