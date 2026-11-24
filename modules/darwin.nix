@@ -73,7 +73,7 @@ in
       home = config.users.users.tothemoon.home;
     in {
       ProgramArguments = [ "/bin/bash" "-c" ''
-        for p in $(pgrep -f 'devenv-wrapped daemon-processes'); do lsof -a -d cwd -p "$p" -Fn | sed -n 's/^n//p'; done |
+        for p in $(pgrep -f '[.]devenv-wrapped daemon-processes'); do lsof -a -d cwd -p "$p" -Fn | sed -n 's/^n//p'; done |
           while IFS= read -r d; do git -C "$d" rev-parse --path-format=absolute --git-common-dir; done |
           sed 's|/\.git$||' | sort -u |
           while IFS= read -r r; do ${home}/.pi/agent/bin/worktrees-idle "$r" --stop; done

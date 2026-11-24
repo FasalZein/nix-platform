@@ -14,12 +14,14 @@ in
   # worktrees (D7). Label org.nix-community.home.worktrees-sweep. launchd runs
   # a missed run once after the Mac wakes.
   launchd.agents.worktrees-sweep = {
-    # Enabled again (owner, 2026-11-24): FasalZein/pi-agent-config#20 closed on
-    # 2026-11-11. worktrees-landed --remove now checks every condition again
-    # on fresh data just before each removal (still landed, clean, not fresh,
-    # both branch names read again, then a new process snapshot) and keeps the
-    # worktree with a "kept:" line when one fails.
-    enable = true;
+    # Disabled (review 2026-11-24). #20 is fixed, but worktrees-landed --remove
+    # can still remove a worktree in use: FasalZein/pi-agent-config#52 (a
+    # session acts between the last check and the removal) and the lsof-failure
+    # case (finding 3 of ~/.pi/agent/.pi/skills/worktree-removal-verify).
+    # Enable when that skill's WorktreeRemovalWindow.cfg and
+    # WorktreeRemovalSnapFail.cfg pass and its late-change-repro.sh prints
+    # "kept" for fresh, local, busy and snapfail.
+    enable = false;
     config = {
       ProgramArguments = [ (lib.getExe (pkgs.callPackage ../packages/worktrees-sweep.nix { })) ];
       StartCalendarInterval = [{ Hour = 3; Minute = 30; }];
