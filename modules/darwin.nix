@@ -39,9 +39,9 @@ in
   nix.settings = {
     experimental-features = "nix-command flakes";
     trusted-users = [ "@admin" "tothemoon" ];
-    # Many agents share 14 cores: Nix builds take at most 2 jobs x 6 cores.
-    max-jobs = 2;
-    cores = 6;
+    # No build limit (owner 2026-11-24): one job per core, and a job may use every core.
+    max-jobs = "auto";
+    cores = 0;
     # Garbage-collect during builds when free space drops under 20 GiB,
     # until 60 GiB are free.
     min-free = gib 20;
@@ -69,7 +69,10 @@ in
   launchd.user.agents.worktree-idle-sweep.serviceConfig =
     let
       home = config.users.users.tothemoon.home;
-      repos = [ "${home}/Dev/Bayland/bayland-portfolio-v1" ];
+      repos = [
+        "${home}/Dev/Bayland/bayland-portfolio-v1"
+        "${home}/Dev/fourth-root/fourth-root-portfolio"
+      ];
     in {
       ProgramArguments = [ "/bin/bash" "-c"
         ''for r in ${lib.escapeShellArgs repos}; do ${home}/.pi/agent/bin/worktrees-idle "$r" --stop; done'' ];
