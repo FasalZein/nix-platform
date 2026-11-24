@@ -191,7 +191,7 @@ A good test checks behavior that someone can observe at the outer boundary of a 
 - **devenv seam.** In a fresh worktree of each phase-2 repo, the devenv shell reports node, bun and package-manager versions equal to the repo's pin files, and the repo's land check (or its verify command, where it has no land check) passes inside devenv. Prior art: the landCheck runs in the 2026-10-23 landcheck-apply report.
 - **Homebrew seam.** `darwin-rebuild switch` passes with cleanup `check`, and nothing undeclared remains. After cleanup moves to `uninstall`, a second switch is a no-op. Each moved tool resolves to the Nix profile, and its smoke command runs.
 - **CI seam.** The workflow is green, the version-assertion step passes, and the ticket records the setup time.
-- Every heavy command (flake check, builds, test suites) runs through `heavy`.
+- Heavy commands (flake check, builds, test suites) run directly: `heavy` is a pass-through since 2026-11-17.
 
 ## Out of Scope
 

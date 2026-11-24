@@ -3,9 +3,7 @@
 let
   gib = n: n * 1024 * 1024 * 1024;
 
-  # Stage 1: false. The first switch must use the default linux-builder,
-  # because a changed builder config has to be built by a Linux builder
-  # (nix-darwin modules/nix/linux-builder.nix). Set true after stage 1 works.
+  # A change to the tuned builder config is built by the running Linux builder.
   builderTuned = true;
   linuxBuilderOnDemand = pkgs.callPackage ../packages/linux-builder-on-demand.nix { };
 
@@ -24,6 +22,9 @@ let
 
   # TLC engine for pstack's statechart skill (issue #29); tla-ts-174 pins TLC 1.7.4.
   tlaTs = pkgs.callPackage ../packages/tla-ts.nix { };
+
+  # Caps a log file in place; run by the worktree-idle-sweep and supertokens-log-cap agents.
+  logSizeCap = lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { });
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -68,11 +69,17 @@ in
   # `devenv up`. The repositories come from the running services (owner 2026-11-24):
   # the working directory of each devenv process manager is a worktree, and git
   # names its main checkout. A new repository needs no change here.
+  # Each run first caps its own log at 10 MB, emptied in place, as
+  # worktrees-sweep does (see log-size-cap.nix). A run writes about 5 KB
+  # (624 KB after 138 runs, 2026-11-24), so 10 MB holds about 3 months.
   launchd.user.agents.worktree-idle-sweep.serviceConfig =
     let
       home = config.users.users.tothemoon.home;
+      log = "${home}/Library/Logs/worktree-idle-sweep.log";
+      logMaxBytes = toString (10 * 1024 * 1024);
     in {
       ProgramArguments = [ "/bin/bash" "-c" ''
+        ${logSizeCap} ${logMaxBytes} ${log} || true
         for p in $(pgrep -f '[.]devenv-wrapped daemon-processes'); do lsof -a -d cwd -p "$p" -Fn | sed -n 's/^n//p'; done |
           while IFS= read -r d; do git -C "$d" rev-parse --path-format=absolute --git-common-dir; done |
           sed 's|/\.git$||' | sort -u |
@@ -86,8 +93,8 @@ in
         HOME = home;
         PATH = "/etc/profiles/per-user/tothemoon/bin:/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin";
       };
-      StandardOutPath = "${home}/Library/Logs/worktree-idle-sweep.log";
-      StandardErrorPath = "${home}/Library/Logs/worktree-idle-sweep.log";
+      StandardOutPath = log;
+      StandardErrorPath = log;
     };
 
   # 9router AI gateway on 127.0.0.1:20128, native instead of Docker (owner
@@ -137,7 +144,7 @@ in
     let home = config.users.users.tothemoon.home;
     in {
       enable = true;
-      # postgresql_17 through the overlay; expected-versions.nix pins 17.11.
+      # postgresql_17 through the overlay; expected-versions.nix pins its version.
       package = pkgs.postgresql;
       port = 5433;
       dataDir = "${home}/.local/state/nix-platform/postgresql-17";
@@ -213,11 +220,9 @@ in
   # again about every 10 s for up to 60 minutes and opens its port when the
   # database answers (tested 2026-11-02). If it gives up and exits, KeepAlive
   # starts it again after launchd's 10 s throttle.
-  # Cutover prerequisite: bayland-platform scripts/local-infra-up.sh and
-  # compose.local.yml start the OrbStack container bayland-platform-supertokens-local
-  # on the same port 3567. Land the bayland-platform change that stops them
-  # first, then stop the container, then switch. Keep the container only for
-  # rollback.
+  # This agent replaced the OrbStack container bayland-platform-supertokens-local
+  # (same port 3567); bayland-platform scripts/local-infra-up.sh no longer
+  # starts it. Keep the container stopped, for rollback only.
   launchd.user.agents.supertokens.serviceConfig =
     let
       home = config.users.users.tothemoon.home;
@@ -268,7 +273,7 @@ in
       maxBytes = toString (100 * 1024 * 1024);
     in {
       ProgramArguments = [
-        (lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { }))
+        logSizeCap
         maxBytes
         "${home}/Library/Logs/supertokens.log"
       ];
@@ -343,6 +348,9 @@ in
     tlaTs
     # ts-gate: landmines lint that the agent harness runs on each commit (report only).
     (pkgs.callPackage ../packages/ts-gate { })
+    # 2password on PATH for shells and agent scripts (bin/secret-scan); the same
+    # package secrets-render runs, in place of the bun global copy.
+    (pkgs.callPackage ../packages/2password { })
   ];
   # /etc/zshenv runs for every zsh, interactive or not; ~/.zshenv and ~/.zshrc stay untouched.
   programs.zsh.shellInit = builtins.replaceStrings [ "@shellEnvFile@" ] [ shellEnvFile ]
@@ -444,8 +452,8 @@ in
     }
   '';
 
-  # Default caps for every shell, including agent shells. `heavy` lowers them
-  # further per slot. Without a cap each vitest run starts cores-1 workers.
+  # Default caps for every shell, including agent shells. Without a cap each
+  # vitest run starts cores-1 workers.
   environment.variables = {
     VITEST_MAX_WORKERS = "4";
     CARGO_BUILD_JOBS = "4";

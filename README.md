@@ -33,7 +33,7 @@ The Linux builder VM runs on demand. The first Linux build starts it and waits f
 
 - `overlays.default` (overlays/default.nix) pins bun, node (majors 22 and 24; the default `nodejs` is 24), uv, and postgres. Rust stays per repo in `rust-toolchain.toml`; pnpm stays in `package.json` `packageManager`.
 - `devenvModules.default` (devenv/devenv.nix) holds settings every repo shares. Repos enable their own languages.
-- `nix flake check` runs `checks.aarch64-darwin.pin-drift`. It fails when a pinned tool (each Node major too) reports a version other than `expected-versions.nix`.
+- `nix flake check` runs every check in `checks.aarch64-darwin` (flake.nix): `pin-drift` fails when a pinned tool (each Node major too) reports a version other than `expected-versions.nix`, `darwin-system` builds the whole system, and the others build and test each package.
 
 Repo template (`devenv.yaml`). The platform repository is public (ADR 0002), so the `github:` reference needs no token.
 
@@ -72,7 +72,7 @@ Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv
 - Roll back: `sudo darwin-rebuild --rollback`
 - Update inputs: `nix flake update`, then switch. Commit `flake.lock`.
 - Dev Postgres 17 (bayland-portfolio-v1): launchd agent `org.nixos.postgresql` on localhost:5433, URL `postgresql://postgres:postgres@localhost:5433/postgres`. Data in `~/.local/state/nix-platform/postgresql-17`, server logs in its `pg_log`, start-up errors in `~/Library/Logs/postgresql.log`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.postgresql`.
-- SuperTokens core 11.4.3 (bayland-platform auth): launchd agent `org.nixos.supertokens` on 127.0.0.1:3567, data in the `supertokens` database of that Postgres, logs in `~/Library/Logs/supertokens.log`, run-time files in `~/.local/state/nix-platform/supertokens`. Check: `curl localhost:3567/hello`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.supertokens`. Before the first switch with this agent: land the bayland-platform change that stops `scripts/local-infra-up.sh` and `compose.local.yml` from starting the SuperTokens container (same port), then `docker stop bayland-platform-supertokens-local`.
+- SuperTokens core 11.4.3 (bayland-platform auth): launchd agent `org.nixos.supertokens` on 127.0.0.1:3567, data in the `supertokens` database of that Postgres, logs in `~/Library/Logs/supertokens.log`, run-time files in `~/.local/state/nix-platform/supertokens`. Check: `curl localhost:3567/hello`. Restart: `launchctl kickstart -k gui/$(id -u)/org.nixos.supertokens`. bayland-platform's `scripts/local-infra-up.sh` no longer starts its own SuperTokens container; keep that container (`bayland-platform-supertokens-local`, same port) stopped.
 
 - Worktree home: new worktrees go under `$WT_ROOT` (`~/Worktrees`), which each switch creates on the home volume. `wt-clonefile SRC DST` clones a whole directory with one `clonefile(2)` call (same APFS volume only). Spotlight: no file or command keeps a folder out of the index on macOS 27.0 (see the comment above `postActivation` in `modules/darwin.nix`). Add it by hand once: System Settings > Spotlight > Search Privacy (on older macOS: Privacy tab), click +, choose `~/Worktrees`. Check after a few minutes: `mdfind -onlyin ~/Worktrees <name of a file in it>` prints nothing.
 
@@ -80,11 +80,11 @@ Add `.envrc` with `eval "$(devenv direnvrc)"` and `use devenv`, then run `direnv
 
 ## Not verified yet
 
-State on 2026-10-24. The first install and stage 2 are done: Lix 2.95.4 runs, and the active system is the `main` configuration. `nix flake check` passes (10 checks). The shell, 9router and ymcq dev env files render at login.
+State on 2026-11-24. The first install and stage 2 are done: Lix 2.95.4 runs. The active system can lag behind `main` until the next switch; interactive zsh prints a notice when it does (modules/stale-system-notice.zsh). `nix flake check` passes and builds the whole system. The shell, 9router and ymcq dev env files render at login.
 
 These parts are not done or not verified yet:
 
-- Phase-2 repos do not use the devenv module yet (#9 to #15). Only Bayland portfolio and trading-platform import it today.
+- Phase-2 repos (#9 to #15): runbook, costwise, gii-atlas, bayland-platform, bayland-elliott-suite and ymcq import the devenv module, as do Bayland portfolio and trading-platform. Each repo's acceptance list is not checked yet.
 - No CI job runs inside devenv yet (#23 to #25).
 - Homebrew is not declared in nix-darwin yet (#16 to #22).
 - Bayland dev and staging do not read rendered env files yet (#5).
