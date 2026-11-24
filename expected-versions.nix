@@ -1,4 +1,4 @@
-# Expected versions of the tools that overlays/default.nix pins.
+# Expected versions of the tools that overlays/default.nix and packages/ghui pin.
 # `nix flake check` (checks.<system>.pin-drift) runs each tool and fails when
 # its reported version differs from the value here. To bump a tool, change the
 # overlay (or run `nix flake update`), then change the value here in the same commit.
@@ -8,5 +8,6 @@
   nodejs_22 = "22.23.4"; # security floor (bwf-astro, bayland-platform, Bayland portfolio); nixpkgs ships it since 9397dcb
   nodejs_24 = "24.22.2"; # major 24 matches CI (actions/setup-node node-version: 24)
   uv = "0.13.7";
+  ghui = "0.9.1"; # packages/ghui; newest release, nixpkgs ships 0.4.6
   postgresql = "17.12"; # major 17 matches the data folder of org.nixos.postgresql (modules/darwin.nix)
 }

@@ -24,7 +24,7 @@
     lazygit
     yazi
     shellcheck
-    ghui
+    (callPackage ../packages/ghui { })
     lumen
     # Pinned by overlays/default.nix (versions in expected-versions.nix).
     # Ahead of Homebrew, ~/.bun/bin and ~/.local/bin via /etc/zlogin (modules/darwin.nix).

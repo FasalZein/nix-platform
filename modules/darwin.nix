@@ -3,9 +3,7 @@
 let
   gib = n: n * 1024 * 1024 * 1024;
 
-  # Stage 1: false. The first switch must use the default linux-builder,
-  # because a changed builder config has to be built by a Linux builder
-  # (nix-darwin modules/nix/linux-builder.nix). Set true after stage 1 works.
+  # A change to the tuned builder config is built by the running Linux builder.
   builderTuned = true;
   linuxBuilderOnDemand = pkgs.callPackage ../packages/linux-builder-on-demand.nix { };
 
@@ -24,6 +22,9 @@ let
 
   # TLC engine for pstack's statechart skill (issue #29); tla-ts-174 pins TLC 1.7.4.
   tlaTs = pkgs.callPackage ../packages/tla-ts.nix { };
+
+  # Caps a log file in place; run by the worktree-idle-sweep and supertokens-log-cap agents.
+  logSizeCap = lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { });
 in
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
@@ -75,7 +76,6 @@ in
     let
       home = config.users.users.tothemoon.home;
       log = "${home}/Library/Logs/worktree-idle-sweep.log";
-      logSizeCap = lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { });
       logMaxBytes = toString (10 * 1024 * 1024);
     in {
       ProgramArguments = [ "/bin/bash" "-c" ''
@@ -273,7 +273,7 @@ in
       maxBytes = toString (100 * 1024 * 1024);
     in {
       ProgramArguments = [
-        (lib.getExe (pkgs.callPackage ../packages/log-size-cap.nix { }))
+        logSizeCap
         maxBytes
         "${home}/Library/Logs/supertokens.log"
       ];

@@ -46,6 +46,8 @@
       tla-ts = pkgs.callPackage ./packages/tla-ts.nix { };
       # Report-only landmines lint for agent commits; installed in modules/darwin.nix.
       ts-gate = pkgs.callPackage ./packages/ts-gate { };
+      # ghui 0.9.1 over nixpkgs' older ghui; installed by home.packages in modules/home.nix.
+      ghui = pkgs.callPackage ./packages/ghui { };
     };
 
     # Fails when a pinned tool reports a version other than expected-versions.nix.
@@ -62,6 +64,7 @@
         check nodejs_24 "$(${pkgs.nodejs_24}/bin/node --version)" "v${expected.nodejs_24}"
         check uv "$(${pkgs.uv}/bin/uv --version | cut -d' ' -f2)" "${expected.uv}"
         check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
+        check ghui "$(${pkgs.lib.getExe self.packages.${system}.ghui} --version)" "${expected.ghui}"
         [ "$fail" = 0 ] && touch $out
       '';
       # Evaluates and builds the whole system (modules, home-manager, launchd
@@ -113,6 +116,34 @@
         ! grep -q 'no-debugger' out
         touch $out
       '';
+      # The build runs nixpkgs' install check plus an import of @effect/sql-sqlite-bun.
+      ghui = self.packages.${system}.ghui;
+      # Boots the built ghui in a pseudo-terminal with mock GitHub data
+      # (GHUI_MOCK_PR_COUNT: no gh, no token, no network) until the app has
+      # mounted and loaded its first pull request list (packages/ghui/start-check.py).
+      # A bundle that fails at load, as "Migrator2 is not defined" did, fails it.
+      ghui-start = pkgs.runCommand "ghui-start" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+        mkdir $TMPDIR/home
+        cd $TMPDIR
+        HOME=$TMPDIR/home TERM=xterm-256color GHUI_MOCK_PR_COUNT=3 \
+          GHUI_MOCK_WORKSPACE_PREFERENCES_PATH=off GHUI_DEBUG_LOG=$TMPDIR/debug.log \
+          python3 ${./packages/ghui/start-check.py} \
+          ${pkgs.lib.getExe self.packages.${system}.ghui} $TMPDIR/debug.log 30
+        touch $out
+      '';
+      # Fails once nixpkgs' own ghui reaches the version packages/ghui pins, so
+      # the override does not hold ghui back after a nixpkgs bump.
+      ghui-override-needed =
+        let g = self.packages.${system}.ghui;
+        in pkgs.runCommand "ghui-override-needed" { } (
+          if pkgs.lib.versionOlder g.nixpkgsVersion g.version then ''
+            echo "ok   nixpkgs ghui ${g.nixpkgsVersion} < packages/ghui ${g.version}"
+            touch $out
+          '' else ''
+            echo "OBSOLETE packages/ghui: nixpkgs ships ghui ${g.nixpkgsVersion}, packages/ghui pins ${g.version}."
+            echo "Delete packages/ghui, use pkgs.ghui in modules/home.nix, and drop the ghui entries in flake.nix and expected-versions.nix."
+            exit 1
+          '');
       # Builds the package; the image digest and hash pin the core version, and
       # the build fails when version.yaml names another core version.
       supertokens = self.packages.${system}.supertokens;
