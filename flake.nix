@@ -64,6 +64,9 @@
         check postgresql "$(${pkgs.postgresql}/bin/postgres --version | cut -d' ' -f3)" "${expected.postgresql}"
         [ "$fail" = 0 ] && touch $out
       '';
+      # Evaluates and builds the whole system (modules, home-manager, launchd
+      # plists, activation scripts), so a broken module fails the check (#32).
+      darwin-system = self.darwinConfigurations."MacBook-Pro-2".system;
       # Builds the package; the tarball hash pins the app version.
       "9router" = self.packages.${system}."9router";
       # writeShellApplication runs shellcheck on the script.
